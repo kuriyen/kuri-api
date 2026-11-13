@@ -1,0 +1,25 @@
+[package]
+name = "kuri-api"
+version = "0.1.0"
+edition = "2021"
+rust-version = "1.85"
+authors = ["bayanasar"]
+license = "MIT OR Apache-2.0"
+repository = "https://github.com/kuriyen/kuri-api"
+description = "The contracts of a home's system plane as plain Rust types: grants and their offline checks, bound to no transport."
+keywords = ["home", "grants", "ed25519", "cbor"]
+categories = ["authentication", "encoding"]
+# Published once reviewed, and only after the check that keeps these types in
+# step with their definition has passed against the commit being published.
+publish = false
+
+[dependencies]
+ciborium = "0.2"
+# Pure Rust, so every target builds with stable cargo and no C toolchain.
+ed25519-dalek = { version = "3", default-features = false, features = ["fast", "zeroize"] }
+serde = { version = "1", features = ["derive"] }
+serde_bytes = "0.11"
+thiserror = "2"
+
+[dev-dependencies]
+serde_json = "1"
