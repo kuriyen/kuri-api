@@ -1,0 +1,131 @@
+{
+  "about": "Requests signed by a grant's holder (the holder signature as CBOR, hex), each checked by a fresh peer that started at started_ns, with the result it must reach. With twice set, the result is the second check of the same request.",
+  "cases": [
+    {
+      "body": "a0",
+      "digest": "5eadbd38e1ab6300696d6c1a778f4da8b94fbfbdef11a57c0cd50622047de2cc",
+      "holder_signature": "a36774696d655f6e731b18fae28ddc2ae800656e6f6e63655055555555555555555555555555555555697369676e61747572655840c9474b146708ebdbf2903cc545c082ade09047e3eaf09ca9a5a1015ff2c1f2266830698bb52cd7f08d128435742324561872210091f51ffc1628113d6a1fe409",
+      "method": "registry/1.WatchNodes",
+      "name": "genuine",
+      "now_ns": 1800000100000000000,
+      "result": "ok",
+      "twice": false
+    },
+    {
+      "body": "a0",
+      "digest": "5eadbd38e1ab6300696d6c1a778f4da8b94fbfbdef11a57c0cd50622047de2cc",
+      "holder_signature": "a36774696d655f6e731b18fae28ddc2ae800656e6f6e63655055555555555555555555555555555555697369676e61747572655840c9474b146708ebdbf2903cc545c082ade09047e3eaf09ca9a5a1015ff2c1f2266830698bb52cd7f08d128435742324561872210091f51ffc1628113d6a1fe409",
+      "method": "registry/1.WatchNodes",
+      "name": "the same request again",
+      "now_ns": 1800000100000000000,
+      "result": {
+        "err": "spent",
+        "why": "the request was seen before"
+      },
+      "twice": true
+    },
+    {
+      "body": "a0",
+      "digest": "5eadbd38e1ab6300696d6c1a778f4da8b94fbfbdef11a57c0cd50622047de2cc",
+      "holder_signature": "a36774696d655f6e731b18fae286e0073c00656e6f6e63655055555555555555555555555555555555697369676e617475726558405cdf53490360c557b070fd117f6e6bf776b87e5291832b61bde8be73ec7e2ac601984f1165df53b37847e9ee871c003f32d54a5c024c368502a6b578e95d5b0c",
+      "method": "registry/1.WatchNodes",
+      "name": "signed 30 seconds ago",
+      "now_ns": 1800000100000000000,
+      "result": "ok",
+      "twice": false
+    },
+    {
+      "body": "a0",
+      "digest": "5eadbd38e1ab6300696d6c1a778f4da8b94fbfbdef11a57c0cd50622047de2cc",
+      "holder_signature": "a36774696d655f6e731b18fae286e0073bff656e6f6e63655055555555555555555555555555555555697369676e61747572655840f6aa893dafcd9d362f9c58d3db3b4eadeee62ec81fe6d063685f990e8192f106ea5c9c20293a491a17ab5781430f625b98097c1fc4e56a371fad733ae9588b03",
+      "method": "registry/1.WatchNodes",
+      "name": "signed 30 seconds and a nanosecond ago",
+      "now_ns": 1800000100000000000,
+      "result": {
+        "err": "expired",
+        "why": "the request was signed too far from now"
+      },
+      "twice": false
+    },
+    {
+      "body": "a0",
+      "digest": "5eadbd38e1ab6300696d6c1a778f4da8b94fbfbdef11a57c0cd50622047de2cc",
+      "holder_signature": "a36774696d655f6e731b18fae294d84e9400656e6f6e63655055555555555555555555555555555555697369676e617475726558407747a86c3a5bd36e4d06cb96dde93abf35d11a2215f03218bb6209eded6f96e9e0a8cb537d34f80b7e5108cd01c21c24e060e7ed83b8bc4f0617041cad9bc40f",
+      "method": "registry/1.WatchNodes",
+      "name": "signed 30 seconds ahead",
+      "now_ns": 1800000100000000000,
+      "result": "ok",
+      "twice": false
+    },
+    {
+      "body": "a0",
+      "digest": "5eadbd38e1ab6300696d6c1a778f4da8b94fbfbdef11a57c0cd50622047de2cc",
+      "holder_signature": "a36774696d655f6e731b18fae27693b3ffff656e6f6e63655055555555555555555555555555555555697369676e61747572655840e5c980318966e2f01238f48e39985b0915a7ca776e9554cef06db8f87593122a22d8ecd9a058ead5cd6189787d097b05912a7285c5dc2e18193c35bf6129250c",
+      "method": "registry/1.WatchNodes",
+      "name": "signed a nanosecond before the peer started",
+      "now_ns": 1800000010000000000,
+      "result": {
+        "err": "expired",
+        "why": "the request was signed before this peer started"
+      },
+      "twice": false
+    },
+    {
+      "body": "a0",
+      "digest": "5eadbd38e1ab6300696d6c1a778f4da8b94fbfbdef11a57c0cd50622047de2cc",
+      "holder_signature": "a36774696d655f6e731b18fae27693b40000656e6f6e63655055555555555555555555555555555555697369676e61747572655840fc2a359c5ffcca8087ac773ab5c6780d07d8ab31327125e330dcafe2746730f36a5a2434fea040a67c5cb1ddbe5ec34de8a434b9bb0d02df891d729813a7060e",
+      "method": "registry/1.WatchNodes",
+      "name": "signed as the peer started",
+      "now_ns": 1800000010000000000,
+      "result": "ok",
+      "twice": false
+    },
+    {
+      "body": "a1617801",
+      "digest": "25d7ef0c2f2194d000574f0bdfd9bfc6b06595aaa7285778fc6a64203a64b627",
+      "holder_signature": "a36774696d655f6e731b18fae28ddc2ae800656e6f6e63655055555555555555555555555555555555697369676e61747572655840c9474b146708ebdbf2903cc545c082ade09047e3eaf09ca9a5a1015ff2c1f2266830698bb52cd7f08d128435742324561872210091f51ffc1628113d6a1fe409",
+      "method": "registry/1.WatchNodes",
+      "name": "another body under the signature",
+      "now_ns": 1800000100000000000,
+      "result": {
+        "err": "holder_proof_failed",
+        "why": "the request is not signed by the grant's holder"
+      },
+      "twice": false
+    },
+    {
+      "body": "a0",
+      "digest": "3c635dcbb045dfd31102ff0e4497bc2385d737fe222b1297ac841c08c8b47f08",
+      "holder_signature": "a36774696d655f6e731b18fae28ddc2ae800656e6f6e63655055555555555555555555555555555555697369676e61747572655840c9474b146708ebdbf2903cc545c082ade09047e3eaf09ca9a5a1015ff2c1f2266830698bb52cd7f08d128435742324561872210091f51ffc1628113d6a1fe409",
+      "method": "power/1.Wake",
+      "name": "another method under the signature",
+      "now_ns": 1800000100000000000,
+      "result": {
+        "err": "holder_proof_failed",
+        "why": "the request is not signed by the grant's holder"
+      },
+      "twice": false
+    },
+    {
+      "body": "a0",
+      "digest": "5eadbd38e1ab6300696d6c1a778f4da8b94fbfbdef11a57c0cd50622047de2cc",
+      "holder_signature": "a36774696d655f6e731b18fae28ddc2ae800656e6f6e63655055555555555555555555555555555555697369676e6174757265584064a6a9f8aef2306ab0b0cf85f295f8a2aca435b8ce6b8a38f17b623bb30a9a463b33a38959092d35474bd7e7b7ea4bc7270a4c179a5768272529e33abf70890c",
+      "method": "registry/1.WatchNodes",
+      "name": "signed by another key",
+      "now_ns": 1800000100000000000,
+      "result": {
+        "err": "holder_proof_failed",
+        "why": "the request is not signed by the grant's holder"
+      },
+      "twice": false
+    }
+  ],
+  "grant": "ab697072696e636970616ca1656279746573456f776e65726870726f7669646572a16562797465734a627261696e2d6e6f6465646b696e6469696e666572656e636568696e7374616e63656872656769737472796573636f70656d62726f6f645f707269766174656a686f6c6465725f6b65795820a09aa5f47a6759802ff955f8dc2d2a14a5c99d23be97f864127ff9383455a4f0686772616e745f696450000102030405060708090a0b0c0d0e0f6e657870697265735f7574635f6e731b18fae2a9ccb998006c6973737565645f65706f63684765706f63682d316f6d61785f6c69666574696d655f6e731b00000045d964b800697369676e61747572655840c90703b14524b6fe69098492db35041ea39646d530138c968b34b398cc24b75e86e43b6de008966d8ee9de8c2ff10f94d133e85d830c94dd67e4981c4df7c206",
+  "issuer_key": "d04ab232742bb4ab3a1368bd4615e4e6d0224ab71a016baf8520a332c9778737",
+  "started_ns": 1800000000000000000,
+  "target": {
+    "instance": "registry",
+    "kind": "inference",
+    "node": "627261696e2d6e6f6465"
+  }
+}

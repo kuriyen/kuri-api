@@ -14,4 +14,5 @@
 - The vocabulary they share: `NodeId`, `CapabilityKind`, `Scope`.
 - CBOR maps with named keys for every type; unknown keys are ignored, and an
   unknown enum member reads as `Unknown`.
-- Test vectors for the grant check, `tests/vectors/grants.json`.
+- Test vectors for the grant check, `tests/vectors/grants.json`, and for
+  holder-signed requests, `tests/vectors/requests.json`.
