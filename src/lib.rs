@@ -14,6 +14,10 @@
 //!   node, and the check a provider runs on it offline.
 //! - [`request`]: a request signed by a grant's holder, for a mesh where a
 //!   forwarding node sees the grant, and the check a peer runs on it offline.
+//! - [`clock`]: the home's clock, read from the issuer, which every check of a
+//!   deadline or a request's time is against.
+//! - [`revocation`]: principals revoked before their grants expire, and the
+//!   heartbeat that finds a revocation a provider missed.
 //!
 //! # Encoding
 //!
@@ -39,8 +43,10 @@
 #[macro_use]
 mod wire;
 
+pub mod clock;
 pub mod grant;
 pub mod registry;
 pub mod request;
+pub mod revocation;
 
 pub use wire::{from_cbor, to_cbor, DecodeError, EncodeError};

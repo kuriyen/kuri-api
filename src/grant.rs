@@ -235,6 +235,16 @@ impl IssuerKey {
     pub fn to_bytes(&self) -> [u8; 32] {
         self.0.to_bytes()
     }
+
+    /// Whether the issuer signed `message`. Strict, so a signature has one
+    /// valid form and a weak key verifies nothing.
+    pub(crate) fn verify(
+        &self,
+        message: &[u8],
+        signature: &Signature,
+    ) -> Result<(), ed25519_dalek::SignatureError> {
+        self.0.verify_strict(message, signature)
+    }
 }
 
 /// What a grant is being presented for: the provider's own node, and the
@@ -398,8 +408,7 @@ impl Grant {
             .and_then(|bytes| <[u8; 64]>::try_from(bytes).ok())
             .ok_or(Malformed("signature"))?;
         issuer
-            .0
-            .verify_strict(&fields.signed_bytes(), &Signature::from_bytes(&signature))
+            .verify(&fields.signed_bytes(), &Signature::from_bytes(&signature))
             .map_err(|_| Rejection::BadSignature)?;
 
         // Only a genuine grant gets this far, so only the issuer's own grants

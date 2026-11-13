@@ -31,13 +31,16 @@
 //!    started;
 //! 3. verifies the signature against the grant's holder key;
 //! 4. refuses a `(grant_id, nonce)` it has seen, and keeps each pair until
-//!    `time_ns` plus the window has passed.
+//!    `time_ns` plus the window has passed;
+//! 5. refuses a grant whose principal is revoked ([`crate::revocation`]).
+//!
+//! Until the peer has had its first answer for the revocations in force, it
+//! refuses every request signed by a holder: it cannot tell yet which
+//! principals to refuse.
 //!
 //! The rule about the start time is what makes the record of nonces safe to
 //! lose: after a restart, a request signed before it is refused outright, so
 //! nothing recorded before the restart can come back.
-//!
-//! Whether the grant's principal is revoked is checked apart from this.
 //!
 //! How the signature travels with the request, say as an attachment, is the
 //! transport's. This crate draws no randomness and reads no clock: the caller
@@ -50,6 +53,7 @@ use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 
 use crate::grant::{Grant, GrantError, IssuerKey, Rejection, Target, Verified};
+use crate::revocation::Revocations;
 
 /// Prefixes the bytes a holder signs for a request, so the signature can
 /// never pass for anything else.
@@ -172,16 +176,26 @@ pub enum Refusal {
     /// The peer has seen this nonce under this grant before.
     #[error("the request was seen before")]
     Replayed,
+    /// The grant's principal is revoked.
+    #[error("the grant's principal is revoked")]
+    Revoked,
+    /// The peer has not yet had an answer for the revocations in force.
+    #[error("this peer does not know the revocations in force yet")]
+    NotReady,
 }
 
 /// What a refused request tells its sender. The contract has no codes of its
-/// own for a request's time, so a request out of its window, or signed
-/// before the peer started, reads as expired.
+/// own for a request's time, for a revoked principal or for a peer that does
+/// not know the revocations yet, so these read as expired: the grant is no
+/// good here now, and the issuer decides whether to issue another.
 impl From<Refusal> for GrantError {
     fn from(refusal: Refusal) -> Self {
         match refusal {
             Refusal::Grant(rejection) => rejection.into(),
-            Refusal::OutsideWindow | Refusal::BeforeStart => GrantError::Expired,
+            Refusal::OutsideWindow
+            | Refusal::BeforeStart
+            | Refusal::Revoked
+            | Refusal::NotReady => GrantError::Expired,
             Refusal::HolderSignature => GrantError::HolderProofFailed,
             Refusal::Replayed => GrantError::Spent,
         }
@@ -189,11 +203,13 @@ impl From<Refusal> for GrantError {
 }
 
 /// One peer's check of holder-signed requests: the issuer it trusts, when it
-/// started, and the nonces it has seen within the window.
+/// started, the nonces it has seen within the window, and the revocations in
+/// force.
 #[derive(Debug)]
 pub struct Requests {
     issuer: IssuerKey,
     started_ns: i64,
+    revocations: Revocations,
     /// Each `(grant_id, nonce)` seen, with the time after which it is
     /// forgotten.
     seen: HashMap<(Vec<u8>, [u8; REQUEST_NONCE_LEN]), i64>,
@@ -202,13 +218,22 @@ pub struct Requests {
 impl Requests {
     /// A check that trusts grants signed by `issuer`, for a peer that first
     /// read the home's clock at `started_ns`. A request signed before then is
-    /// refused.
+    /// refused, and so is every request until the revocations have had their
+    /// first answer ([`Requests::revocations`]).
     pub fn new(issuer: IssuerKey, started_ns: i64) -> Self {
         Requests {
+            revocations: Revocations::new(issuer.clone()),
             issuer,
             started_ns,
             seen: HashMap::new(),
         }
+    }
+
+    /// The revocations this check refuses by: give them the answers to the
+    /// peer's queries for the list, the revocations published and the
+    /// issuer's heartbeats.
+    pub fn revocations(&mut self) -> &mut Revocations {
+        &mut self.revocations
     }
 
     /// Checks a request to `target`, whose digest is `digest`, made under
@@ -226,6 +251,9 @@ impl Requests {
         holder: &HolderSignature,
         now_ns: i64,
     ) -> Result<Verified, Refusal> {
+        if !self.revocations.ready() {
+            return Err(Refusal::NotReady);
+        }
         let verified = grant.check(&self.issuer, target, now_ns)?;
         if holder.time_ns.abs_diff(now_ns) > REQUEST_WINDOW_NS as u64 {
             return Err(Refusal::OutsideWindow);
@@ -238,6 +266,10 @@ impl Requests {
         let bytes = signed_bytes(&verified.grant_id, digest, holder.time_ns, &holder.nonce);
         key.verify_strict(&bytes, &Signature::from_bytes(&holder.signature))
             .map_err(|_| Refusal::HolderSignature)?;
+
+        if self.revocations.is_revoked(&verified.principal, now_ns) {
+            return Err(Refusal::Revoked);
+        }
 
         self.prune(now_ns);
         let forget_at = holder.time_ns.saturating_add(REQUEST_WINDOW_NS);
@@ -256,6 +288,7 @@ impl Requests {
     /// [`check`]: Requests::check
     pub fn prune(&mut self, now_ns: i64) {
         self.seen.retain(|_, forget_at| now_ns <= *forget_at);
+        self.revocations.prune(now_ns);
     }
 
     /// How many nonces are kept.

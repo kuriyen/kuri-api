@@ -42,8 +42,8 @@ with a newer writer.
 
 0.1 is being written. Besides grants, it carries requests signed by a
 grant's holder (`request`), for a mesh where every node that forwards a
-request sees the grant in it. Still to come: the registry for readers, the
-home's clock, revocations and power.
+request sees the grant in it; the home's clock (`clock`); and revocations
+(`revocation`). Still to come: the registry for readers, and power.
 
 ## License
 

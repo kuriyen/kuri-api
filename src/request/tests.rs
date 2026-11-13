@@ -3,6 +3,7 @@ use ed25519_dalek::{Signer, SigningKey};
 use super::*;
 use crate::grant::{PrincipalId, MAX_GRANT_LIFETIME_NS};
 use crate::registry::{CapabilityKind, NodeId, Scope};
+use crate::revocation::{Revocation, RevocationList, RevokeHeartbeat};
 use crate::{from_cbor, to_cbor};
 
 const STARTED: i64 = 1_800_000_000_000_000_000;
@@ -56,11 +57,42 @@ fn grant() -> Grant {
     grant
 }
 
+fn list(revocations: Vec<Revocation>, newest: i64) -> RevocationList {
+    RevocationList {
+        revocations,
+        newest: RevokeHeartbeat {
+            revoked_ns: newest,
+            signature: issuer()
+                .sign(&RevokeHeartbeat::signed_bytes(newest))
+                .to_bytes(),
+        },
+    }
+}
+
+fn revocation(revoked_ns: i64) -> Revocation {
+    let principal = PrincipalId {
+        bytes: b"owner".to_vec(),
+    };
+    let until_ns = revoked_ns + MAX_GRANT_LIFETIME_NS;
+    Revocation {
+        signature: issuer()
+            .sign(&Revocation::signed_bytes(&principal, revoked_ns, until_ns))
+            .to_bytes(),
+        principal,
+        revoked_ns,
+        until_ns,
+    }
+}
+
+/// A peer that started at `STARTED` and has had its first answer: no
+/// revocation in force.
 fn requests() -> Requests {
-    Requests::new(
+    let mut requests = Requests::new(
         IssuerKey::from_bytes(&issuer().verifying_key().to_bytes()).unwrap(),
         STARTED,
-    )
+    );
+    requests.revocations().answer(&list(vec![], 0)).unwrap();
+    requests
 }
 
 fn digest() -> RequestDigest {
@@ -292,6 +324,42 @@ fn a_holder_signature_survives_the_wire() {
     let signature = signed(NOW, 4);
     let decoded: HolderSignature = from_cbor(&to_cbor(&signature).unwrap()).unwrap();
     assert_eq!(decoded, signature);
+}
+
+#[test]
+fn nothing_passes_before_the_revocations_are_known() {
+    let node = node();
+    let mut requests = Requests::new(
+        IssuerKey::from_bytes(&issuer().verifying_key().to_bytes()).unwrap(),
+        STARTED,
+    );
+    assert_eq!(
+        requests.check(&grant(), &target(&node), &digest(), &signed(NOW, 1), NOW),
+        Err(Refusal::NotReady)
+    );
+    requests.revocations().answer(&list(vec![], 0)).unwrap();
+    assert!(requests
+        .check(&grant(), &target(&node), &digest(), &signed(NOW, 1), NOW)
+        .is_ok());
+}
+
+#[test]
+fn a_revoked_principals_grant_serves_nothing() {
+    let node = node();
+    let mut requests = requests();
+    requests
+        .revocations()
+        .revoked(&revocation(NOW - SECOND))
+        .unwrap();
+    assert_eq!(
+        requests.check(&grant(), &target(&node), &digest(), &signed(NOW, 1), NOW),
+        Err(Refusal::Revoked)
+    );
+    assert_eq!(
+        requests.remembered(),
+        0,
+        "a refused request records nothing"
+    );
 }
 
 #[test]

@@ -9,6 +9,7 @@
       "name": "genuine",
       "now_ns": 1800000100000000000,
       "result": "ok",
+      "revocations": "a26b7265766f636174696f6e7380666e6577657374a26a7265766f6b65645f6e7300697369676e6174757265584092131109065f5dd1d8db23eed868a3edda0e05f9821fd9ee23c3eabad5eb487672c8ec86b473296e415f26c889d4b15e2416c26bffbe22e191bd75c3e0ebd00b",
       "twice": false
     },
     {
@@ -22,6 +23,7 @@
         "err": "spent",
         "why": "the request was seen before"
       },
+      "revocations": "a26b7265766f636174696f6e7380666e6577657374a26a7265766f6b65645f6e7300697369676e6174757265584092131109065f5dd1d8db23eed868a3edda0e05f9821fd9ee23c3eabad5eb487672c8ec86b473296e415f26c889d4b15e2416c26bffbe22e191bd75c3e0ebd00b",
       "twice": true
     },
     {
@@ -32,6 +34,7 @@
       "name": "signed 30 seconds ago",
       "now_ns": 1800000100000000000,
       "result": "ok",
+      "revocations": "a26b7265766f636174696f6e7380666e6577657374a26a7265766f6b65645f6e7300697369676e6174757265584092131109065f5dd1d8db23eed868a3edda0e05f9821fd9ee23c3eabad5eb487672c8ec86b473296e415f26c889d4b15e2416c26bffbe22e191bd75c3e0ebd00b",
       "twice": false
     },
     {
@@ -45,6 +48,7 @@
         "err": "expired",
         "why": "the request was signed too far from now"
       },
+      "revocations": "a26b7265766f636174696f6e7380666e6577657374a26a7265766f6b65645f6e7300697369676e6174757265584092131109065f5dd1d8db23eed868a3edda0e05f9821fd9ee23c3eabad5eb487672c8ec86b473296e415f26c889d4b15e2416c26bffbe22e191bd75c3e0ebd00b",
       "twice": false
     },
     {
@@ -55,6 +59,7 @@
       "name": "signed 30 seconds ahead",
       "now_ns": 1800000100000000000,
       "result": "ok",
+      "revocations": "a26b7265766f636174696f6e7380666e6577657374a26a7265766f6b65645f6e7300697369676e6174757265584092131109065f5dd1d8db23eed868a3edda0e05f9821fd9ee23c3eabad5eb487672c8ec86b473296e415f26c889d4b15e2416c26bffbe22e191bd75c3e0ebd00b",
       "twice": false
     },
     {
@@ -68,6 +73,7 @@
         "err": "expired",
         "why": "the request was signed before this peer started"
       },
+      "revocations": "a26b7265766f636174696f6e7380666e6577657374a26a7265766f6b65645f6e7300697369676e6174757265584092131109065f5dd1d8db23eed868a3edda0e05f9821fd9ee23c3eabad5eb487672c8ec86b473296e415f26c889d4b15e2416c26bffbe22e191bd75c3e0ebd00b",
       "twice": false
     },
     {
@@ -78,6 +84,7 @@
       "name": "signed as the peer started",
       "now_ns": 1800000010000000000,
       "result": "ok",
+      "revocations": "a26b7265766f636174696f6e7380666e6577657374a26a7265766f6b65645f6e7300697369676e6174757265584092131109065f5dd1d8db23eed868a3edda0e05f9821fd9ee23c3eabad5eb487672c8ec86b473296e415f26c889d4b15e2416c26bffbe22e191bd75c3e0ebd00b",
       "twice": false
     },
     {
@@ -91,6 +98,7 @@
         "err": "holder_proof_failed",
         "why": "the request is not signed by the grant's holder"
       },
+      "revocations": "a26b7265766f636174696f6e7380666e6577657374a26a7265766f6b65645f6e7300697369676e6174757265584092131109065f5dd1d8db23eed868a3edda0e05f9821fd9ee23c3eabad5eb487672c8ec86b473296e415f26c889d4b15e2416c26bffbe22e191bd75c3e0ebd00b",
       "twice": false
     },
     {
@@ -104,6 +112,7 @@
         "err": "holder_proof_failed",
         "why": "the request is not signed by the grant's holder"
       },
+      "revocations": "a26b7265766f636174696f6e7380666e6577657374a26a7265766f6b65645f6e7300697369676e6174757265584092131109065f5dd1d8db23eed868a3edda0e05f9821fd9ee23c3eabad5eb487672c8ec86b473296e415f26c889d4b15e2416c26bffbe22e191bd75c3e0ebd00b",
       "twice": false
     },
     {
@@ -117,6 +126,35 @@
         "err": "holder_proof_failed",
         "why": "the request is not signed by the grant's holder"
       },
+      "revocations": "a26b7265766f636174696f6e7380666e6577657374a26a7265766f6b65645f6e7300697369676e6174757265584092131109065f5dd1d8db23eed868a3edda0e05f9821fd9ee23c3eabad5eb487672c8ec86b473296e415f26c889d4b15e2416c26bffbe22e191bd75c3e0ebd00b",
+      "twice": false
+    },
+    {
+      "body": "a0",
+      "digest": "5eadbd38e1ab6300696d6c1a778f4da8b94fbfbdef11a57c0cd50622047de2cc",
+      "holder_signature": "a36774696d655f6e731b18fae28ddc2ae800656e6f6e63655055555555555555555555555555555555697369676e61747572655840c9474b146708ebdbf2903cc545c082ade09047e3eaf09ca9a5a1015ff2c1f2266830698bb52cd7f08d128435742324561872210091f51ffc1628113d6a1fe409",
+      "method": "registry/1.WatchNodes",
+      "name": "its principal revoked",
+      "now_ns": 1800000100000000000,
+      "result": {
+        "err": "expired",
+        "why": "the grant's principal is revoked"
+      },
+      "revocations": "a26b7265766f636174696f6e7381a4697072696e636970616ca1656279746573456f776e65726a7265766f6b65645f6e731b18fae28da0901e0068756e74696c5f6e731b18fae2d379f4d600697369676e617475726558404a5bf1bb7edb05b9ec2b38d29bfe6cf7fff921bbab351b33a04038924c9791dd956c58febc6156b42065480b5493d9fad0baccb1e39bc14e8836dab7bb587900666e6577657374a26a7265766f6b65645f6e731b18fae28da0901e00697369676e617475726558400a38c0de309b432ebd29a2c01e32b4b3a4615e2fbb4c2b27da7221ec38a1ffd024fb8d2676567a74dc9d44928c613d2a4625e9ba39e67b9ad4b5a1989ca5480b",
+      "twice": false
+    },
+    {
+      "body": "a0",
+      "digest": "5eadbd38e1ab6300696d6c1a778f4da8b94fbfbdef11a57c0cd50622047de2cc",
+      "holder_signature": "a36774696d655f6e731b18fae28ddc2ae800656e6f6e63655055555555555555555555555555555555697369676e61747572655840c9474b146708ebdbf2903cc545c082ade09047e3eaf09ca9a5a1015ff2c1f2266830698bb52cd7f08d128435742324561872210091f51ffc1628113d6a1fe409",
+      "method": "registry/1.WatchNodes",
+      "name": "before the peer knows the revocations",
+      "now_ns": 1800000100000000000,
+      "result": {
+        "err": "expired",
+        "why": "this peer does not know the revocations in force yet"
+      },
+      "revocations": null,
       "twice": false
     }
   ],

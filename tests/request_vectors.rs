@@ -3,8 +3,10 @@
 //!
 //! `tests/vectors/requests.json` is generated here from fixed keys, as the
 //! grant vectors are; `KURI_API_WRITE_VECTORS=1` rewrites it. Each case is
-//! checked by a peer of its own, which started at `started_ns`; a case with
-//! `twice` set is checked twice, and its result is the second check's.
+//! checked by a peer of its own, which started at `started_ns` and was given
+//! the case's `revocations` as the answer to its query for the list (none if
+//! null); a case with `twice` set is checked twice, and its result is the
+//! second check's.
 
 use std::path::Path;
 
@@ -12,6 +14,7 @@ use ed25519_dalek::{Signer, SigningKey};
 use kuri_api::grant::{Grant, GrantError, IssuerKey, PrincipalId, Target};
 use kuri_api::registry::{CapabilityKind, NodeId, Scope};
 use kuri_api::request::{HolderKey, HolderSignature, RequestDigest, Requests};
+use kuri_api::revocation::{Revocation, RevocationList, RevokeHeartbeat};
 use kuri_api::{from_cbor, to_cbor};
 use serde_json::{json, Value};
 
@@ -68,8 +71,38 @@ fn grant() -> Grant {
     grant
 }
 
+fn list(revocations: Vec<Revocation>, newest: i64) -> RevocationList {
+    RevocationList {
+        revocations,
+        newest: RevokeHeartbeat {
+            revoked_ns: newest,
+            signature: issuer()
+                .sign(&RevokeHeartbeat::signed_bytes(newest))
+                .to_bytes(),
+        },
+    }
+}
+
+fn revoked_owner() -> RevocationList {
+    let principal = PrincipalId {
+        bytes: b"owner".to_vec(),
+    };
+    let revoked_ns = NOW - SECOND;
+    let until_ns = revoked_ns + 300 * SECOND;
+    let revocation = Revocation {
+        signature: issuer()
+            .sign(&Revocation::signed_bytes(&principal, revoked_ns, until_ns))
+            .to_bytes(),
+        principal,
+        revoked_ns,
+        until_ns,
+    };
+    list(vec![revocation], revoked_ns)
+}
+
 struct Case {
     name: &'static str,
+    revocations: Option<RevocationList>,
     method: &'static str,
     body: &'static [u8],
     holder: HolderSignature,
@@ -89,6 +122,7 @@ fn signed(time_ns: i64) -> HolderSignature {
 fn case(name: &'static str, holder: HolderSignature) -> Case {
     Case {
         name,
+        revocations: Some(list(vec![], 0)),
         method: METHOD,
         body: BODY,
         holder,
@@ -136,6 +170,14 @@ fn cases() -> Vec<Case> {
             ..case("another method under the signature", signed(NOW))
         },
         case("signed by another key", thief),
+        Case {
+            revocations: Some(revoked_owner()),
+            ..case("its principal revoked", signed(NOW))
+        },
+        Case {
+            revocations: None,
+            ..case("before the peer knows the revocations", signed(NOW))
+        },
     ]
 }
 
@@ -150,6 +192,9 @@ fn check(case: &Case, issuer: &IssuerKey, started_ns: i64) -> Value {
     };
     let digest = RequestDigest::of(case.method, case.body);
     let mut peer = Requests::new(issuer.clone(), started_ns);
+    if let Some(list) = &case.revocations {
+        peer.revocations().answer(list).unwrap();
+    }
     let mut result = peer.check(&grant(), &target, &digest, &case.holder, case.now_ns);
     if case.twice {
         result = peer.check(&grant(), &target, &digest, &case.holder, case.now_ns);
@@ -173,6 +218,7 @@ fn build() -> String {
                 "body": hex(case.body),
                 "digest": hex(&RequestDigest::of(case.method, case.body).0),
                 "holder_signature": hex(&to_cbor(&case.holder).unwrap()),
+                "revocations": case.revocations.as_ref().map(|list| hex(&to_cbor(list).unwrap())),
                 "now_ns": case.now_ns,
                 "twice": case.twice,
                 "result": check(case, &issuer_key, STARTED),
@@ -225,7 +271,7 @@ fn every_vector_holds() {
         instance: file["target"]["instance"].as_str().unwrap(),
     };
     let cases = file["cases"].as_array().unwrap();
-    assert!(cases.len() >= 10);
+    assert!(cases.len() >= 12);
     for case in cases {
         let name = case["name"].as_str().unwrap();
         let body = unhex(case["body"].as_str().unwrap());
@@ -235,6 +281,10 @@ fn every_vector_holds() {
             from_cbor(&unhex(case["holder_signature"].as_str().unwrap())).unwrap();
         let now = case["now_ns"].as_i64().unwrap();
         let mut peer = Requests::new(issuer.clone(), file["started_ns"].as_i64().unwrap());
+        if let Some(list) = case["revocations"].as_str() {
+            let list: RevocationList = from_cbor(&unhex(list)).unwrap();
+            peer.revocations().answer(&list).unwrap();
+        }
         let mut result = peer.check(&grant, &target, &digest, &holder, now);
         if case["twice"].as_bool().unwrap() {
             result = peer.check(&grant, &target, &digest, &holder, now);
