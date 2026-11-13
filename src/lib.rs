@@ -12,6 +12,8 @@
 //!   kinds of capability it serves, and the scope of what it serves.
 //! - [`grant`]: a grant, the signed permission to reach one capability on one
 //!   node, and the check a provider runs on it offline.
+//! - [`request`]: a request signed by a grant's holder, for a mesh where a
+//!   forwarding node sees the grant, and the check a peer runs on it offline.
 //!
 //! # Encoding
 //!
@@ -39,5 +41,6 @@ mod wire;
 
 pub mod grant;
 pub mod registry;
+pub mod request;
 
 pub use wire::{from_cbor, to_cbor, DecodeError, EncodeError};

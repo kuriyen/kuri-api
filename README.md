@@ -40,8 +40,10 @@ with a newer writer.
 
 ## Status
 
-0.1 is being written. It will also carry the registry for readers, the
-holder's signature on a request, the home's clock, revocations and power.
+0.1 is being written. Besides grants, it carries requests signed by a
+grant's holder (`request`), for a mesh where every node that forwards a
+request sees the grant in it. Still to come: the registry for readers, the
+home's clock, revocations and power.
 
 ## License
 
