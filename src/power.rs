@@ -6,6 +6,9 @@
 //! awake for ever. A member asleep shows as [`Health::Asleep`] in the graph,
 //! and as [`Health::Online`] once it is up.
 //!
+//! A hold's id is all it takes to renew or release the hold, so keep it as
+//! you would a credential.
+//!
 //! [`Health::Asleep`]: crate::registry::Health::Asleep
 //! [`Health::Online`]: crate::registry::Health::Online
 
@@ -22,7 +25,9 @@ pub const HOLD_ID_LEN: usize = 16;
 flexible_enum! {
     /// Why a power call did not succeed.
     pub enum PowerError {
-        /// The node is not in the graph.
+        /// The brain knows no such node. It keeps its own record of how to
+        /// wake each node, so a node asleep long enough to have left the
+        /// graph can still be woken.
         UnknownNode = 1, "unknown_node";
         /// The brain knows no way to wake this node.
         CannotWake = 2, "cannot_wake";
