@@ -33,3 +33,7 @@
   and `value`.
 - Test vectors for the grant check, `tests/vectors/grants.json`, and for
   holder-signed requests, `tests/vectors/requests.json`.
+- `tests/surface.json`, generated from the types: every table, struct, enum,
+  union and constant this crate mirrors, with its members, for the check
+  that keeps it in step with the definition. Every flexible enum lists its
+  members in `ALL`.

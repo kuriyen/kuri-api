@@ -1,0 +1,171 @@
+{
+  "about": "What this crate mirrors of the contracts' definition, generated from its types: tables and structs with their fields, enums with their members' names and numbers, unions with their members' names, constants with their values. Names are this crate's; enum members are in their wire form.",
+  "consts": {
+    "HOLD_ID_LEN": 16,
+    "MAX_ACCELERATORS": 8,
+    "MAX_CAPABILITIES": 16,
+    "MAX_COMPUTE_CAPABILITIES": 2,
+    "MAX_GRANT_LIFETIME_NS": 300000000000,
+    "MAX_HOLD_NS": 600000000000,
+    "MAX_LINKS": 8,
+    "MAX_NODES": 24,
+    "MAX_NODE_EVENTS": 8,
+    "WATCH_TICK_NS": 10000000000
+  },
+  "enums": {
+    "AcceleratorKind": {
+      "gpu": 1,
+      "npu": 3,
+      "tpu": 2
+    },
+    "CapabilityKind": {
+      "actuator": 3,
+      "compute": 4,
+      "inference": 2,
+      "sensor": 1
+    },
+    "GrantError": {
+      "denied_by_policy": 3,
+      "expired": 9,
+      "holder_proof_failed": 5,
+      "invalid_grant": 6,
+      "no_challenge": 11,
+      "spent": 10,
+      "tier_ceiling": 4,
+      "unauthenticated": 1,
+      "unknown_capability": 2,
+      "unknown_service": 12,
+      "untrusted_signature": 7,
+      "wrong_target": 8
+    },
+    "Health": {
+      "asleep": 3,
+      "online": 1,
+      "stale": 2
+    },
+    "LinkKind": {
+      "ethernet": 1,
+      "infiniband": 4,
+      "thunderbolt": 3,
+      "wifi": 2
+    },
+    "PowerError": {
+      "cannot_wake": 2,
+      "invalid_duration": 4,
+      "unknown_hold": 3,
+      "unknown_node": 1
+    },
+    "Rdma": {
+      "infiniband": 3,
+      "none": 1,
+      "roce_v2": 2,
+      "thunderbolt": 4
+    },
+    "RegistryError": {
+      "graph_full": 3,
+      "invalid_announcement": 1,
+      "not_enrolled": 2
+    },
+    "Scope": {
+      "brood_private": 2,
+      "brood_shared": 3,
+      "owner_private": 1
+    }
+  },
+  "structs": {
+    "NodeId": [
+      "bytes"
+    ],
+    "PowerHoldRequest": [
+      "duration_ns",
+      "node"
+    ],
+    "PowerHoldResponse": [
+      "hold_id",
+      "until_ns"
+    ],
+    "PowerReleaseRequest": [
+      "hold_id"
+    ],
+    "PowerRenewRequest": [
+      "duration_ns",
+      "hold_id"
+    ],
+    "PowerRenewResponse": [
+      "until_ns"
+    ],
+    "PowerWakeRequest": [
+      "node"
+    ],
+    "PrincipalId": [
+      "bytes"
+    ],
+    "RegistryReaderWatchResponse": [
+      "events"
+    ]
+  },
+  "tables": {
+    "Accelerator": [
+      "kind",
+      "memory_bytes",
+      "model"
+    ],
+    "Announcement": [
+      "capabilities",
+      "label",
+      "links",
+      "node"
+    ],
+    "Capability": [
+      "compute",
+      "instance",
+      "kind",
+      "scope"
+    ],
+    "Compute": [
+      "accelerators",
+      "memory_bytes"
+    ],
+    "Grant": [
+      "expires_utc_ns",
+      "grant_id",
+      "holder_key",
+      "instance",
+      "issued_epoch",
+      "kind",
+      "max_lifetime_ns",
+      "principal",
+      "provider",
+      "scope",
+      "signature"
+    ],
+    "GrantRequest": [
+      "holder_key",
+      "instance",
+      "kind",
+      "principal",
+      "provider"
+    ],
+    "Link": [
+      "kind",
+      "peer",
+      "rdma",
+      "segment",
+      "speed_bps"
+    ],
+    "NodeState": [
+      "announcement",
+      "health",
+      "last_seen_monotonic_ns"
+    ]
+  },
+  "unions": {
+    "NodeEvent": [
+      "existing",
+      "idle",
+      "added",
+      "changed",
+      "removed"
+    ]
+  }
+}

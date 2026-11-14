@@ -53,6 +53,9 @@ macro_rules! flexible_enum {
         }
 
         impl $name {
+            /// Every member this version knows, in the definition's order.
+            pub const ALL: &'static [Self] = &[$(Self::$variant,)*];
+
             /// The member's number in the contract's definition, or `None`
             /// for [`Self::Unknown`].
             pub fn number(self) -> Option<u32> {
