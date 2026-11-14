@@ -6,8 +6,8 @@ rust-version = "1.85"
 authors = ["bayanasar"]
 license = "MIT OR Apache-2.0"
 repository = "https://github.com/kuriyen/kuri-api"
-description = "The contracts of a home's system plane as plain Rust types: grants and their offline checks, bound to no transport."
-keywords = ["home", "grants", "ed25519", "cbor"]
+description = "The contracts of a home's system plane as plain Rust types: grants and the checks a peer runs offline, signed requests, the home's clock, revocations, the registry and power. Bound to no transport."
+keywords = ["home", "grants", "registry", "ed25519", "cbor"]
 categories = ["authentication", "encoding"]
 
 [dependencies]
