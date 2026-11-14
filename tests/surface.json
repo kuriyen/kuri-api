@@ -1,5 +1,5 @@
 {
-  "about": "What this crate mirrors of the contracts' definition, generated from its types: tables and structs with their fields, enums with their members' names and numbers, unions with their members' names, constants with their values. Names are this crate's; enum members are in their wire form.",
+  "about": "What this crate mirrors of the contracts' definition, generated from its types: tables and structs with their fields and each field's Rust type, enums with their members' names and numbers, unions with their members' names, constants with their values. Names are this crate's; enum members are in their wire form.",
   "consts": {
     "HOLD_ID_LEN": 16,
     "MAX_ACCELERATORS": 8,
@@ -73,91 +73,91 @@
     }
   },
   "structs": {
-    "NodeId": [
-      "bytes"
-    ],
-    "PowerHoldRequest": [
-      "duration_ns",
-      "node"
-    ],
-    "PowerHoldResponse": [
-      "hold_id",
-      "until_ns"
-    ],
-    "PowerReleaseRequest": [
-      "hold_id"
-    ],
-    "PowerRenewRequest": [
-      "duration_ns",
-      "hold_id"
-    ],
-    "PowerRenewResponse": [
-      "until_ns"
-    ],
-    "PowerWakeRequest": [
-      "node"
-    ],
-    "PrincipalId": [
-      "bytes"
-    ],
-    "RegistryReaderWatchResponse": [
-      "events"
-    ]
+    "NodeId": {
+      "bytes": "Vec<u8>"
+    },
+    "PowerHoldRequest": {
+      "duration_ns": "i64",
+      "node": "NodeId"
+    },
+    "PowerHoldResponse": {
+      "hold_id": "[u8;16]",
+      "until_ns": "i64"
+    },
+    "PowerReleaseRequest": {
+      "hold_id": "[u8;16]"
+    },
+    "PowerRenewRequest": {
+      "duration_ns": "i64",
+      "hold_id": "[u8;16]"
+    },
+    "PowerRenewResponse": {
+      "until_ns": "i64"
+    },
+    "PowerWakeRequest": {
+      "node": "NodeId"
+    },
+    "PrincipalId": {
+      "bytes": "Vec<u8>"
+    },
+    "RegistryReaderWatchResponse": {
+      "events": "Vec<NodeEvent>"
+    }
   },
   "tables": {
-    "Accelerator": [
-      "kind",
-      "memory_bytes",
-      "model"
-    ],
-    "Announcement": [
-      "capabilities",
-      "label",
-      "links",
-      "node"
-    ],
-    "Capability": [
-      "compute",
-      "instance",
-      "kind",
-      "scope"
-    ],
-    "Compute": [
-      "accelerators",
-      "memory_bytes"
-    ],
-    "Grant": [
-      "expires_utc_ns",
-      "grant_id",
-      "holder_key",
-      "instance",
-      "issued_epoch",
-      "kind",
-      "max_lifetime_ns",
-      "principal",
-      "provider",
-      "scope",
-      "signature"
-    ],
-    "GrantRequest": [
-      "holder_key",
-      "instance",
-      "kind",
-      "principal",
-      "provider"
-    ],
-    "Link": [
-      "kind",
-      "peer",
-      "rdma",
-      "segment",
-      "speed_bps"
-    ],
-    "NodeState": [
-      "announcement",
-      "health",
-      "last_seen_monotonic_ns"
-    ]
+    "Accelerator": {
+      "kind": "Option<AcceleratorKind>",
+      "memory_bytes": "Option<u64>",
+      "model": "Option<String>"
+    },
+    "Announcement": {
+      "capabilities": "Option<Vec<Capability>>",
+      "label": "Option<String>",
+      "links": "Option<Vec<Link>>",
+      "node": "Option<NodeId>"
+    },
+    "Capability": {
+      "compute": "Option<Compute>",
+      "instance": "Option<String>",
+      "kind": "Option<CapabilityKind>",
+      "scope": "Option<Scope>"
+    },
+    "Compute": {
+      "accelerators": "Option<Vec<Accelerator>>",
+      "memory_bytes": "Option<u64>"
+    },
+    "Grant": {
+      "expires_utc_ns": "Option<i64>",
+      "grant_id": "Option<Vec<u8>>",
+      "holder_key": "Option<Vec<u8>>",
+      "instance": "Option<String>",
+      "issued_epoch": "Option<Vec<u8>>",
+      "kind": "Option<CapabilityKind>",
+      "max_lifetime_ns": "Option<i64>",
+      "principal": "Option<PrincipalId>",
+      "provider": "Option<NodeId>",
+      "scope": "Option<Scope>",
+      "signature": "Option<Vec<u8>>"
+    },
+    "GrantRequest": {
+      "holder_key": "Option<Vec<u8>>",
+      "instance": "Option<String>",
+      "kind": "Option<CapabilityKind>",
+      "principal": "Option<PrincipalId>",
+      "provider": "Option<NodeId>"
+    },
+    "Link": {
+      "kind": "Option<LinkKind>",
+      "peer": "Option<NodeId>",
+      "rdma": "Option<Rdma>",
+      "segment": "Option<String>",
+      "speed_bps": "Option<u64>"
+    },
+    "NodeState": {
+      "announcement": "Option<Announcement>",
+      "health": "Option<Health>",
+      "last_seen_monotonic_ns": "Option<i64>"
+    }
   },
   "unions": {
     "NodeEvent": [

@@ -35,6 +35,46 @@ fn fields<T: Serialize>(value: &T) -> Vec<String> {
     }
 }
 
+/// A Rust type's name without its paths: `core::option::Option<u64>` ->
+/// `Option<u64>`.
+fn short(name: &str) -> String {
+    let mut out = String::new();
+    let mut word = String::new();
+    for c in name.chars().chain(std::iter::once(' ')) {
+        if c.is_alphanumeric() || c == '_' || c == ':' {
+            word.push(c);
+        } else {
+            out.push_str(word.rsplit("::").next().unwrap());
+            word.clear();
+            if c != ' ' || !out.is_empty() && !out.ends_with(';') {
+                out.push(c);
+            }
+        }
+    }
+    out.trim_end().to_owned()
+}
+
+/// Each field of a struct value with its Rust type, by destructuring it: a
+/// field left out does not compile, and the names must be the ones the value
+/// encodes.
+macro_rules! shape {
+    ($value:expr, $t:ident { $($f:ident),* $(,)? }) => {{
+        let value = $value;
+        let keys = fields(&value);
+        let $t { $($f),* } = value;
+        let map: BTreeMap<String, String> = BTreeMap::from([
+            $((stringify!($f).to_owned(), short(std::any::type_name_of_val(&$f)))),*
+        ]);
+        assert_eq!(
+            map.keys().cloned().collect::<Vec<_>>(),
+            keys,
+            "{} encodes other field names than it has",
+            stringify!($t)
+        );
+        map
+    }};
+}
+
 fn node() -> NodeId {
     NodeId { bytes: vec![1] }
 }
@@ -105,67 +145,189 @@ macro_rules! enums {
 
 fn build() -> String {
     let id = [0u8; HOLD_ID_LEN];
-    let tables: BTreeMap<&str, Vec<String>> = BTreeMap::from([
-        ("Accelerator", fields(&accelerator())),
-        ("Announcement", fields(&announcement())),
-        ("Capability", fields(&capability())),
-        ("Compute", fields(&compute())),
+    let full_grant = Grant {
+        principal: Some(PrincipalId::default()),
+        provider: Some(node()),
+        kind: Some(CapabilityKind::Sensor),
+        instance: Some(String::new()),
+        scope: Some(Scope::OwnerPrivate),
+        holder_key: Some(vec![]),
+        grant_id: Some(vec![]),
+        expires_utc_ns: Some(0),
+        issued_epoch: Some(vec![]),
+        max_lifetime_ns: Some(0),
+        signature: Some(vec![]),
+    };
+    let full_request = GrantRequest {
+        principal: Some(PrincipalId::default()),
+        provider: Some(node()),
+        kind: Some(CapabilityKind::Sensor),
+        instance: Some(String::new()),
+        holder_key: Some(vec![]),
+    };
+    let tables: BTreeMap<&str, BTreeMap<String, String>> = BTreeMap::from([
+        (
+            "Accelerator",
+            shape!(
+                accelerator(),
+                Accelerator {
+                    kind,
+                    model,
+                    memory_bytes
+                }
+            ),
+        ),
+        (
+            "Announcement",
+            shape!(
+                announcement(),
+                Announcement {
+                    node,
+                    label,
+                    capabilities,
+                    links
+                }
+            ),
+        ),
+        (
+            "Capability",
+            shape!(
+                capability(),
+                Capability {
+                    kind,
+                    instance,
+                    scope,
+                    compute
+                }
+            ),
+        ),
+        (
+            "Compute",
+            shape!(
+                compute(),
+                Compute {
+                    accelerators,
+                    memory_bytes
+                }
+            ),
+        ),
         (
             "Grant",
-            fields(&Grant {
-                principal: Some(PrincipalId::default()),
-                provider: Some(node()),
-                kind: Some(CapabilityKind::Sensor),
-                instance: Some(String::new()),
-                scope: Some(Scope::OwnerPrivate),
-                holder_key: Some(vec![]),
-                grant_id: Some(vec![]),
-                expires_utc_ns: Some(0),
-                issued_epoch: Some(vec![]),
-                max_lifetime_ns: Some(0),
-                signature: Some(vec![]),
-            }),
+            shape!(
+                full_grant,
+                Grant {
+                    principal,
+                    provider,
+                    kind,
+                    instance,
+                    scope,
+                    holder_key,
+                    grant_id,
+                    expires_utc_ns,
+                    issued_epoch,
+                    max_lifetime_ns,
+                    signature,
+                }
+            ),
         ),
         (
             "GrantRequest",
-            fields(&GrantRequest {
-                principal: Some(PrincipalId::default()),
-                provider: Some(node()),
-                kind: Some(CapabilityKind::Sensor),
-                instance: Some(String::new()),
-                holder_key: Some(vec![]),
-            }),
+            shape!(
+                full_request,
+                GrantRequest {
+                    principal,
+                    provider,
+                    kind,
+                    instance,
+                    holder_key
+                }
+            ),
         ),
-        ("Link", fields(&link())),
-        ("NodeState", fields(&node_state())),
+        (
+            "Link",
+            shape!(
+                link(),
+                Link {
+                    kind,
+                    speed_bps,
+                    rdma,
+                    peer,
+                    segment
+                }
+            ),
+        ),
+        (
+            "NodeState",
+            shape!(
+                node_state(),
+                NodeState {
+                    announcement,
+                    health,
+                    last_seen_monotonic_ns
+                }
+            ),
+        ),
     ]);
-    let structs: BTreeMap<&str, Vec<String>> = BTreeMap::from([
-        ("NodeId", fields(&node())),
-        ("PrincipalId", fields(&PrincipalId::default())),
-        ("PowerHoldRequest", fields(&PowerHoldRequest::default())),
+    let structs: BTreeMap<&str, BTreeMap<String, String>> = BTreeMap::from([
+        ("NodeId", shape!(node(), NodeId { bytes })),
+        (
+            "PrincipalId",
+            shape!(PrincipalId::default(), PrincipalId { bytes }),
+        ),
+        (
+            "PowerHoldRequest",
+            shape!(
+                PowerHoldRequest::default(),
+                PowerHoldRequest { node, duration_ns }
+            ),
+        ),
         (
             "PowerHoldResponse",
-            fields(&PowerHoldResponse {
-                hold_id: id,
-                until_ns: 0,
-            }),
+            shape!(
+                PowerHoldResponse {
+                    hold_id: id,
+                    until_ns: 0
+                },
+                PowerHoldResponse { hold_id, until_ns }
+            ),
         ),
         (
             "PowerReleaseRequest",
-            fields(&PowerReleaseRequest { hold_id: id }),
+            shape!(
+                PowerReleaseRequest { hold_id: id },
+                PowerReleaseRequest { hold_id }
+            ),
         ),
         (
             "PowerRenewRequest",
-            fields(&PowerRenewRequest {
-                hold_id: id,
-                duration_ns: 0,
-            }),
+            shape!(
+                PowerRenewRequest {
+                    hold_id: id,
+                    duration_ns: 0
+                },
+                PowerRenewRequest {
+                    hold_id,
+                    duration_ns
+                }
+            ),
         ),
-        ("PowerRenewResponse", fields(&PowerRenewResponse::default())),
-        ("PowerWakeRequest", fields(&PowerWakeRequest::default())),
+        (
+            "PowerRenewResponse",
+            shape!(
+                PowerRenewResponse::default(),
+                PowerRenewResponse { until_ns }
+            ),
+        ),
+        (
+            "PowerWakeRequest",
+            shape!(PowerWakeRequest::default(), PowerWakeRequest { node }),
+        ),
         (
             "RegistryReaderWatchResponse",
-            fields(&RegistryReaderWatchResponse::default()),
+            shape!(
+                RegistryReaderWatchResponse::default(),
+                RegistryReaderWatchResponse { events }
+            ),
         ),
     ]);
     let enums = enums!(
@@ -211,7 +373,7 @@ fn build() -> String {
         ("WATCH_TICK_NS", WATCH_TICK_NS),
     ]);
     let file = json!({
-        "about": "What this crate mirrors of the contracts' definition, generated from its types: tables and structs with their fields, enums with their members' names and numbers, unions with their members' names, constants with their values. Names are this crate's; enum members are in their wire form.",
+        "about": "What this crate mirrors of the contracts' definition, generated from its types: tables and structs with their fields and each field's Rust type, enums with their members' names and numbers, unions with their members' names, constants with their values. Names are this crate's; enum members are in their wire form.",
         "tables": tables,
         "structs": structs,
         "enums": enums,
