@@ -25,6 +25,9 @@
   `Compute` and `Accelerator`s, and the node's `Link`s; `Health` (with
   `asleep`), `NodeState`, and `NodeEvent`, the graph as changes: `existing`
   nodes, `idle`, then `added`, `changed` and `removed`.
+- Power: `PowerError` and the requests and answers of `Wake`, `Hold`,
+  `Renew` and `Release`; a hold lasts at most `MAX_HOLD_NS` (ten minutes)
+  unless renewed.
 - CBOR maps with named keys for every type; unknown keys are ignored, and an
   unknown enum or union member reads as `Unknown`. A union is a map of `type`
   and `value`.

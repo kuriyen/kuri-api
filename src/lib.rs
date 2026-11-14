@@ -19,6 +19,7 @@
 //!   deadline or a request's time is against.
 //! - [`revocation`]: principals revoked before their grants expire, and the
 //!   heartbeat that finds a revocation a provider missed.
+//! - [`power`]: waking a member that sleeps, and holding it awake.
 //!
 //! # Encoding
 //!
@@ -50,6 +51,7 @@ mod wire;
 
 pub mod clock;
 pub mod grant;
+pub mod power;
 pub mod registry;
 pub mod request;
 pub mod revocation;
