@@ -1,6 +1,6 @@
 # Changelog
 
-## 0.1.0 (unreleased)
+## 0.1.0 — 2026-11-14
 
 - Grants: `Grant`, `GrantRequest` and `GrantError`, and `Grant::check`, the
   check a provider runs offline: the issuer's Ed25519 signature over the

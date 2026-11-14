@@ -9,9 +9,6 @@ repository = "https://github.com/kuriyen/kuri-api"
 description = "The contracts of a home's system plane as plain Rust types: grants and their offline checks, bound to no transport."
 keywords = ["home", "grants", "ed25519", "cbor"]
 categories = ["authentication", "encoding"]
-# Published once reviewed, and only after the check that keeps these types in
-# step with their definition has passed against the commit being published.
-publish = false
 
 [dependencies]
 ciborium = "0.2"
