@@ -210,7 +210,8 @@ flexible_enum! {
         InvalidAnnouncement = 1, "invalid_announcement";
         /// The node is not known: register again.
         NotEnrolled = 2, "not_enrolled";
-        /// The graph holds [`MAX_NODES`] and none of them is stale.
+        /// The graph holds [`MAX_NODES`] and none of them is stale or
+        /// asleep: retry later.
         GraphFull = 3, "graph_full";
     }
 }
@@ -251,6 +252,9 @@ pub struct NodeState {
 /// A reader is first sent an `Existing` for each node, then `Idle`, after
 /// which it holds the graph; then `Added`, `Changed` and `Removed`, coalesced,
 /// so that a node that changed twice is one `Changed` with its latest state.
+/// A node already sent as `Existing` may come again as `Changed` or `Removed`
+/// before `Idle`, if it changed or left meanwhile; a reader applies them as it
+/// would after.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum NodeEvent {
     /// A node that was in the graph when the watch began.

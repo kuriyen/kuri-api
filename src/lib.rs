@@ -36,6 +36,12 @@
 //!   this version does not know reads as the union's `Unknown` case.
 //! - **Structs**, a method's request or answer, have every field required.
 //!
+//! Decoding checks the shape, not the definition's bounds: a string, byte
+//! string or list longer than its `MAX_` constant decodes. Every check this
+//! crate runs on a value (a grant, a request, a revocation) refuses one out of
+//! bounds; any other value a reader takes from the network, it bounds itself
+//! with those constants.
+//!
 //! # Versions
 //!
 //! Each protocol is named with its major version (`grants/1`). Within one,
