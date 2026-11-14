@@ -20,8 +20,13 @@
   heartbeat means the list should be asked for again. Only an answer sets how
   new the provider's list is. `Requests` refuses a revoked principal, and
   every request until the first answer.
-- The vocabulary they share: `NodeId`, `CapabilityKind`, `Scope`.
+- The registry, for readers: `NodeId`, `CapabilityKind` (with `compute`),
+  `Scope`; `Announcement` with its `Capability` list, a compute capability's
+  `Compute` and `Accelerator`s, and the node's `Link`s; `Health` (with
+  `asleep`), `NodeState`, and `NodeEvent`, the graph as changes: `existing`
+  nodes, `idle`, then `added`, `changed` and `removed`.
 - CBOR maps with named keys for every type; unknown keys are ignored, and an
-  unknown enum member reads as `Unknown`.
+  unknown enum or union member reads as `Unknown`. A union is a map of `type`
+  and `value`.
 - Test vectors for the grant check, `tests/vectors/grants.json`, and for
   holder-signed requests, `tests/vectors/requests.json`.

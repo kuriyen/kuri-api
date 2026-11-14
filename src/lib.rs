@@ -8,8 +8,9 @@
 //!
 //! # What is here
 //!
-//! - [`registry`]: the vocabulary every contract shares, a node's identity, the
-//!   kinds of capability it serves, and the scope of what it serves.
+//! - [`registry`]: a node's identity, what it serves (compute described) and
+//!   how widely, its links, and the graph as a reader sees it: whole, then as
+//!   changes ([`registry::NodeEvent`]).
 //! - [`grant`]: a grant, the signed permission to reach one capability on one
 //!   node, and the check a provider runs on it offline.
 //! - [`request`]: a request signed by a grant's holder, for a mesh where a
@@ -29,6 +30,10 @@
 //!   reader keeps working with a newer writer.
 //! - **Enums** encode as their names in `snake_case`. A name this version does
 //!   not know reads as the enum's `Unknown` case.
+//! - **Unions** encode as a map of `type`, the member's name in `snake_case`,
+//!   and `value`, its content, absent for a member that carries none. A name
+//!   this version does not know reads as the union's `Unknown` case.
+//! - **Structs**, a method's request or answer, have every field required.
 //!
 //! # Versions
 //!
