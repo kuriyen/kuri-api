@@ -31,7 +31,7 @@
 //!    started;
 //! 3. verifies the signature against the grant's holder key;
 //! 4. refuses a `(grant_id, nonce)` it has seen, and keeps each pair until
-//!    `time_ns` plus the window has passed;
+//!    `time_ns` plus the window and [`NONCE_MARGIN_NS`] has passed;
 //! 5. refuses a grant whose principal is revoked ([`crate::revocation`]).
 //!
 //! Until the peer has had its first answer for the revocations in force, it
@@ -52,6 +52,7 @@ use ed25519_dalek::{Signature, Signer, SigningKey, VerifyingKey};
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 
+use crate::clock::MAX_ROUND_TRIP_NS;
 use crate::grant::{Grant, GrantError, IssuerKey, Rejection, Target, Verified};
 use crate::revocation::Revocations;
 
@@ -64,9 +65,19 @@ pub const REQUEST_CONTEXT: &[u8] = b"kuri-api.HolderRequest/v1\0";
 ///
 /// The home's clock is off by about half a round trip on a home network, well
 /// under a second; the rest is room for delivery through a router and for the
-/// time between two readings of the clock. The window bounds the record of
-/// nonces at 60 seconds of traffic.
+/// time between two readings of the clock. The window, with
+/// [`NONCE_MARGIN_NS`], bounds the record of nonces at 62 seconds of traffic.
 pub const REQUEST_WINDOW_NS: i64 = 30_000_000_000;
+
+/// How much longer than the window a nonce is kept: two seconds, twice
+/// [`MAX_ROUND_TRIP_NS`].
+///
+/// A peer's reading of the home's clock is not monotonic. Each reading is off
+/// by up to half a round trip, so the next one can be up to a round trip
+/// earlier, plus drift. Without the margin, a reading that steps back just
+/// after a nonce is forgotten would let the same request pass the window
+/// again.
+pub const NONCE_MARGIN_NS: i64 = 2 * MAX_ROUND_TRIP_NS;
 
 /// The length of a request's nonce.
 pub const REQUEST_NONCE_LEN: usize = 16;
@@ -272,7 +283,9 @@ impl Requests {
         }
 
         self.prune(now_ns);
-        let forget_at = holder.time_ns.saturating_add(REQUEST_WINDOW_NS);
+        let forget_at = holder
+            .time_ns
+            .saturating_add(REQUEST_WINDOW_NS + NONCE_MARGIN_NS);
         match self.seen.entry((verified.grant_id.clone(), holder.nonce)) {
             std::collections::hash_map::Entry::Occupied(_) => Err(Refusal::Replayed),
             std::collections::hash_map::Entry::Vacant(entry) => {
@@ -282,7 +295,8 @@ impl Requests {
         }
     }
 
-    /// Forgets nonces whose requests can no longer pass the window. [`check`]
+    /// Forgets nonces whose requests can no longer pass the window, even after
+    /// the clock steps back by up to [`NONCE_MARGIN_NS`]. [`check`]
     /// does this as it goes; a peer may also call it when idle.
     ///
     /// [`check`]: Requests::check

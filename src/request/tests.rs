@@ -308,14 +308,34 @@ fn nonces_are_kept_only_while_their_requests_could_pass() {
         requests.check(&grant(), &target(&node), &digest(), &signature, last),
         Err(Refusal::Replayed)
     );
-    requests.prune(last);
+    // Kept for the margin past the window too.
+    let kept = last + NONCE_MARGIN_NS;
+    requests.prune(kept);
     assert_eq!(requests.remembered(), 1);
     // After it, the nonce goes, and the request fails the window instead.
-    requests.prune(last + 1);
+    requests.prune(kept + 1);
     assert_eq!(requests.remembered(), 0);
     assert_eq!(
-        requests.check(&grant(), &target(&node), &digest(), &signature, last + 1),
+        requests.check(&grant(), &target(&node), &digest(), &signature, kept + 1),
         Err(Refusal::OutsideWindow)
+    );
+}
+
+#[test]
+fn a_clock_that_steps_back_does_not_reopen_a_spent_nonce() {
+    let node = node();
+    let mut requests = requests();
+    let signature = signed(NOW, 1);
+    requests
+        .check(&grant(), &target(&node), &digest(), &signature, NOW)
+        .unwrap();
+    // The clock passes the window, and the peer prunes...
+    requests.prune(NOW + 30 * SECOND + 400_000_000);
+    // ...then reads the home's clock again, which lands 0.6 s earlier.
+    let back = NOW + 29 * SECOND + 800_000_000;
+    assert_eq!(
+        requests.check(&grant(), &target(&node), &digest(), &signature, back),
+        Err(Refusal::Replayed)
     );
 }
 
