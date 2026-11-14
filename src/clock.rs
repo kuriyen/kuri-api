@@ -23,9 +23,16 @@
 //! whoever could forge the time could forge a grant. The nonce is what keeps
 //! a recorded answer from being replayed to set a node's clock back.
 //!
-//! Where a node's monotonic clock stops while it sleeps, the offset falls
-//! behind by the time asleep, so such a node reads the clock again on
-//! waking.
+//! The readings a caller passes, here and to [`HomeClock::now`], should come
+//! from a clock that runs in sleep where the system has one:
+//! `CLOCK_BOOTTIME` on Linux and Android, `mach_continuous_time` on macOS and
+//! iOS, the boot clock on Fuchsia, `QueryInterruptTime` on Windows. The
+//! offset then still holds after waking, off only by the drift while asleep,
+//! and reading again every [`READ_EVERY_NS`] takes that up. A clock that stops
+//! in sleep (Rust's `Instant` does, on Linux and macOS alike) leaves the
+//! offset behind by the time asleep, and a clock behind accepts grants that
+//! have expired; a node with only such a clock reads the home's clock again
+//! on waking, and until the answer comes treats it as unread.
 
 use ed25519_dalek::Signature;
 use serde::{Deserialize, Serialize};
