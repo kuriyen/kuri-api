@@ -6,7 +6,8 @@
 //! presents the grant to the provider with each request, and the provider
 //! checks it without calling anyone ([`Grant::check`]): the issuer's
 //! signature, that the grant names this node, kind and instance, and that its
-//! deadline on the home's clock has not passed. So the issuer stays off the
+//! deadline on the home's clock has not passed and is no further off than a
+//! grant can live ([`DEADLINE_SLACK_NS`]). So the issuer stays off the
 //! path of every call, and grants keep working while it restarts.
 //!
 //! A grant is bound to its holder: it names the public key whose private half
@@ -52,6 +53,16 @@ pub const GRANT_CONTEXT: &[u8] = b"kuri-api.Grant/v1\0";
 
 /// The longest `max_lifetime_ns` a provider accepts: five minutes.
 pub const MAX_GRANT_LIFETIME_NS: i64 = 300_000_000_000;
+
+/// How far past [`MAX_GRANT_LIFETIME_NS`] from now a grant's deadline may
+/// lie: 30 seconds, room for the issuer's and the provider's readings of the
+/// home's clock to differ.
+///
+/// A revocation is kept only until its time plus [`MAX_GRANT_LIFETIME_NS`],
+/// which holds only if no grant outlives that. A deadline further off is an
+/// issuer's bug, and is refused when the grant is first presented, so the bug
+/// shows instead of quietly outlasting revocations.
+pub const DEADLINE_SLACK_NS: i64 = 30_000_000_000;
 
 /// The length of a holder key: an Ed25519 public key.
 pub const HOLDER_KEY_LEN: usize = 32;
@@ -201,6 +212,10 @@ pub enum Rejection {
     /// The grant's deadline on the home's clock has passed.
     #[error("the grant's deadline has passed")]
     Expired,
+    /// A genuine grant whose deadline lies further off than a grant can live,
+    /// plus [`DEADLINE_SLACK_NS`]: the issuer's bug, refused as invalid.
+    #[error("the grant's deadline is further off than a grant can live")]
+    DeadlineTooFar,
 }
 
 impl From<Rejection> for GrantError {
@@ -210,6 +225,7 @@ impl From<Rejection> for GrantError {
             Rejection::BadSignature => GrantError::UntrustedSignature,
             Rejection::WrongTarget => GrantError::WrongTarget,
             Rejection::Expired => GrantError::Expired,
+            Rejection::DeadlineTooFar => GrantError::InvalidGrant,
         }
     }
 }
@@ -387,9 +403,10 @@ impl Grant {
     /// home's clock.
     ///
     /// In order: the grant is well formed; the issuer signed it; it names
-    /// `target`; and its deadline has not passed. A grant without a deadline
-    /// on the home's clock is refused as malformed, since only that deadline
-    /// bounds it here.
+    /// `target`; its deadline has not passed; and its deadline is no later
+    /// than `now_ns` plus [`MAX_GRANT_LIFETIME_NS`] and [`DEADLINE_SLACK_NS`].
+    /// A grant without a deadline on the home's clock is refused as
+    /// malformed, since only that deadline bounds it here.
     ///
     /// The check is the grant's own. The provider still has to see that the
     /// party presenting it holds [`Verified::holder_key`], and that its
@@ -421,6 +438,9 @@ impl Grant {
         }
         if now_ns >= expires_ns {
             return Err(Rejection::Expired);
+        }
+        if expires_ns > now_ns.saturating_add(MAX_GRANT_LIFETIME_NS + DEADLINE_SLACK_NS) {
+            return Err(Rejection::DeadlineTooFar);
         }
         Ok(Verified {
             principal: PrincipalId {

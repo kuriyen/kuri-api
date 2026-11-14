@@ -146,6 +146,20 @@ fn cases() -> Vec<Case> {
             },
         ),
         case(
+            "a deadline five and a half minutes out, the furthest accepted",
+            sign(Grant {
+                expires_utc_ns: Some(NOW + 5 * MINUTE + MINUTE / 2),
+                ..base()
+            }),
+        ),
+        case(
+            "a deadline a nanosecond further",
+            sign(Grant {
+                expires_utc_ns: Some(NOW + 5 * MINUTE + MINUTE / 2 + 1),
+                ..base()
+            }),
+        ),
+        case(
             "no signature",
             Grant {
                 signature: None,

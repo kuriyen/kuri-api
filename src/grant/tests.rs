@@ -191,6 +191,27 @@ fn the_deadline_is_exclusive() {
 }
 
 #[test]
+fn a_deadline_further_off_than_a_grant_can_live_is_refused() {
+    let node = node();
+    let furthest = NOW + MAX_GRANT_LIFETIME_NS + DEADLINE_SLACK_NS;
+    let at = |expires| {
+        sign(Grant {
+            expires_utc_ns: Some(expires),
+            ..unsigned()
+        })
+        .check(&issuer_key(), &target(&node), NOW)
+    };
+    assert!(at(furthest).is_ok());
+    assert_eq!(at(furthest + 1), Err(Rejection::DeadlineTooFar));
+    // An hour out, as an issuer with a bug might sign it.
+    assert_eq!(at(NOW + 3_600_000_000_000), Err(Rejection::DeadlineTooFar));
+    assert_eq!(
+        GrantError::from(Rejection::DeadlineTooFar),
+        GrantError::InvalidGrant
+    );
+}
+
+#[test]
 fn a_malformed_grant_names_its_field() {
     let node = node();
     let cases: [Change; 16] = [
