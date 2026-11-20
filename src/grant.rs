@@ -58,10 +58,13 @@ pub const MAX_GRANT_LIFETIME_NS: i64 = 300_000_000_000;
 /// lie: 30 seconds, room for the issuer's and the provider's readings of the
 /// home's clock to differ.
 ///
-/// A revocation is kept only until its time plus [`MAX_GRANT_LIFETIME_NS`],
-/// which holds only if no grant outlives that. A deadline further off is an
-/// issuer's bug, and is refused when the grant is first presented, so the bug
-/// shows instead of quietly outlasting revocations.
+/// A provider keeps a revocation until its time plus [`MAX_GRANT_LIFETIME_NS`]
+/// and this slack. That covers every grant issued before the revocation whose
+/// deadline is at most the lifetime plus the slack after its issue. A deadline
+/// further off is an issuer's bug. It is refused whenever the grant is
+/// presented while more than the lifetime plus the slack remains, so the bug
+/// shows; a grant held back unpresented until less remains is not caught
+/// here, since a grant does not say when it was issued.
 pub const DEADLINE_SLACK_NS: i64 = 30_000_000_000;
 
 /// The length of a holder key: an Ed25519 public key.
@@ -145,8 +148,11 @@ pub struct Grant {
     /// Which run of the issuer issued it, opaque.
     #[serde(default, with = "serde_bytes", skip_serializing_if = "Option::is_none")]
     pub issued_epoch: Option<Vec<u8>>,
-    /// How long it lasts from a provider's first sight of it, for a provider
-    /// that has not read the home's clock. At most [`MAX_GRANT_LIFETIME_NS`].
+    /// How long it lasts from a provider's first sight of it, the bound a
+    /// provider uses before it has read the home's clock. The signature covers
+    /// it and [`Grant::check`] requires it between 1 ns and
+    /// [`MAX_GRANT_LIFETIME_NS`], but this crate's check never decides expiry
+    /// by it: it always has the home's clock, and goes by `expires_utc_ns`.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub max_lifetime_ns: Option<i64>,
     /// The issuer's Ed25519 signature over [`Grant::signed_bytes`].

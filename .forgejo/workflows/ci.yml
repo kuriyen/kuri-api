@@ -59,3 +59,36 @@ jobs:
           for target in aarch64-unknown-linux-musl x86_64-unknown-fuchsia aarch64-unknown-fuchsia; do
             cargo check --offline --locked --target "$target"
           done
+
+  # The oldest Rust that Cargo.toml's rust-version claims. Resolved afresh, as
+  # a downstream edition 2021 workspace resolves: Cargo then picks the newest
+  # compatible release of each dependency whatever Rust it needs, so a
+  # dependency that raises its own minimum shows up here.
+  msrv:
+    name: msrv
+    runs-on: linux-docker
+    timeout-minutes: 30
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Rust toolchain from rust-version
+        run: |
+          if ! command -v rustup >/dev/null 2>&1; then
+            curl --proto '=https' --tlsv1.2 -fsSL https://sh.rustup.rs \
+              | sh -s -- -y --profile minimal --default-toolchain none --no-modify-path
+            echo "$HOME/.cargo/bin" >> "$GITHUB_PATH"
+            export PATH="$HOME/.cargo/bin:$PATH"
+          fi
+          msrv=$(sed -n 's/^rust-version = "\(.*\)"$/\1/p' Cargo.toml)
+          test -n "$msrv"
+          rustup toolchain install "$msrv" --profile minimal
+          echo "MSRV=$msrv" >> "$GITHUB_ENV"
+
+      - name: Build the library
+        run: |
+          cargo +"$MSRV" update
+          cargo +"$MSRV" build --lib

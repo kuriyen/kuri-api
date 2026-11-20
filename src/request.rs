@@ -17,17 +17,19 @@
 //! ```
 //!
 //! - `request_digest` is SHA-256 over `u32le(len(method)) || method || body`:
-//!   `method` is the versioned name and method (`registry/1.WatchNodes`), and
-//!   `body` is the request's CBOR as sent. A forwarder can neither change the
-//!   request nor attach the signature to another ([`RequestDigest`]).
+//!   `method` is the protocol, its major version and the method
+//!   (`registry/1.Watch`), and `body` is the request's CBOR as sent. A
+//!   forwarder can neither change the request nor attach the signature to
+//!   another ([`RequestDigest`]).
 //! - `time_ns` is the home's clock at signing, and `nonce` is 16 fresh random
 //!   bytes.
 //!
 //! The peer ([`Requests::check`]), in order:
 //!
 //! 1. checks the grant itself ([`Grant::check`]);
-//! 2. takes `time_ns` only within [`REQUEST_WINDOW_NS`] of its own reading of
-//!    the home's clock, either way, and not earlier than the moment it
+//! 2. takes `time_ns` only if it is at most [`REQUEST_WINDOW_NS`] behind its
+//!    own reading of the home's clock and at most [`REQUEST_AHEAD_NS`] ahead
+//!    of it, and only if it is more than [`START_GUARD_NS`] after the peer
 //!    started;
 //! 3. verifies the signature against the grant's holder key;
 //! 4. refuses a `(grant_id, nonce)` it has seen, and keeps each pair until
@@ -38,9 +40,25 @@
 //! refuses every request signed by a holder: it cannot tell yet which
 //! principals to refuse.
 //!
-//! The rule about the start time is what makes the record of nonces safe to
-//! lose: after a restart, a request signed before it is refused outright, so
-//! nothing recorded before the restart can come back.
+//! # Why the record of nonces is safe to lose
+//!
+//! A peer that restarts forgets the nonces it has seen. What keeps those
+//! requests from passing again is the rule about the start time, and it
+//! holds because of the bound on how far ahead a request may be:
+//!
+//! - Before the restart, the peer took a request only if its `time_ns` was at
+//!   most [`REQUEST_AHEAD_NS`] ahead of the peer's reading then.
+//! - That reading came before the peer's first reading after the restart,
+//!   `started_ns`. A later reading can come out earlier by at most
+//!   [`NONCE_MARGIN_NS`] (each is off by up to half a round trip, plus drift).
+//! - So every request taken before the restart has `time_ns` at most
+//!   `started_ns +` [`START_GUARD_NS`], and the peer refuses every request
+//!   whose `time_ns` is not past that.
+//!
+//! If a request could be as far ahead as it may be behind, the guard would
+//! have to be as long as the window. The cost of the guard: for
+//! [`START_GUARD_NS`] after starting, the peer refuses every request signed by
+//! a holder, and the holder signs again.
 //!
 //! How the signature travels with the request, say as an attachment, is the
 //! transport's. This crate draws no randomness and reads no clock: the caller
@@ -60,14 +78,32 @@ use crate::revocation::Revocations;
 /// never pass for anything else.
 pub const REQUEST_CONTEXT: &[u8] = b"kuri-api.HolderRequest/v1\0";
 
-/// How far a request's time may be from the peer's reading of the home's
-/// clock, either way: 30 seconds.
+/// How far a request's time may be behind the peer's reading of the home's
+/// clock: 30 seconds.
 ///
 /// The home's clock is off by about half a round trip on a home network, well
 /// under a second; the rest is room for delivery through a router and for the
 /// time between two readings of the clock. The window, with
-/// [`NONCE_MARGIN_NS`], bounds the record of nonces at 62 seconds of traffic.
+/// [`REQUEST_AHEAD_NS`] and [`NONCE_MARGIN_NS`], bounds the record of nonces
+/// at 34 seconds of traffic, and a second more between prunes.
 pub const REQUEST_WINDOW_NS: i64 = 30_000_000_000;
+
+/// How far a request's time may be ahead of the peer's reading of the home's
+/// clock: two seconds, as [`NONCE_MARGIN_NS`].
+///
+/// A request is signed before it is checked, so an honest one is ahead only
+/// by the error of two readings of the home's clock, the holder's and the
+/// peer's: the bound [`NONCE_MARGIN_NS`] already puts on two readings. Keeping
+/// this short is what keeps [`START_GUARD_NS`] short (see the
+/// [module](self) documentation).
+pub const REQUEST_AHEAD_NS: i64 = NONCE_MARGIN_NS;
+
+/// How long after its start a peer refuses requests signed by a holder: four
+/// seconds, [`REQUEST_AHEAD_NS`] plus [`NONCE_MARGIN_NS`].
+///
+/// A request whose time is not past `started_ns` plus this may have been taken
+/// before a restart, when its nonce was recorded in a record now lost.
+pub const START_GUARD_NS: i64 = REQUEST_AHEAD_NS + NONCE_MARGIN_NS;
 
 /// How much longer than the window a nonce is kept: two seconds, twice
 /// [`MAX_ROUND_TRIP_NS`].
@@ -79,6 +115,10 @@ pub const REQUEST_WINDOW_NS: i64 = 30_000_000_000;
 /// again.
 pub const NONCE_MARGIN_NS: i64 = 2 * MAX_ROUND_TRIP_NS;
 
+/// How often [`Requests::check`] forgets what has run out: once a second, so a
+/// busy peer does not walk its whole record of nonces on every request.
+const PRUNE_EVERY_NS: i64 = 1_000_000_000;
+
 /// The length of a request's nonce.
 pub const REQUEST_NONCE_LEN: usize = 16;
 
@@ -87,8 +127,8 @@ pub const REQUEST_NONCE_LEN: usize = 16;
 pub struct RequestDigest(pub [u8; 32]);
 
 impl RequestDigest {
-    /// The digest of a request for `method` (the versioned name and method,
-    /// such as `registry/1.WatchNodes`) whose CBOR body is `body`.
+    /// The digest of a request for `method` (the protocol, its major version
+    /// and the method, such as `registry/1.Watch`) whose CBOR body is `body`.
     pub fn of(method: &str, body: &[u8]) -> Self {
         let mut hash = Sha256::new();
         hash.update((method.len() as u32).to_le_bytes());
@@ -172,13 +212,15 @@ pub enum Refusal {
     /// The grant itself does not pass.
     #[error(transparent)]
     Grant(#[from] Rejection),
-    /// The request's time is more than the window away from the peer's
-    /// reading of the home's clock.
+    /// The request's time is more than [`REQUEST_WINDOW_NS`] behind the
+    /// peer's reading of the home's clock, or more than [`REQUEST_AHEAD_NS`]
+    /// ahead of it.
     #[error("the request was signed too far from now")]
     OutsideWindow,
-    /// The request was signed before the peer started, so the peer cannot
-    /// tell whether it saw its nonce before.
-    #[error("the request was signed before this peer started")]
+    /// The request's time is not more than [`START_GUARD_NS`] after the peer
+    /// started, so the peer cannot tell whether it saw its nonce before a
+    /// restart.
+    #[error("the request was signed before this peer started taking requests")]
     BeforeStart,
     /// The signature does not verify against the grant's holder key: the
     /// grant is genuine, its presenter is not, or the request was changed.
@@ -224,19 +266,23 @@ pub struct Requests {
     /// Each `(grant_id, nonce)` seen, with the time after which it is
     /// forgotten.
     seen: HashMap<(Vec<u8>, [u8; REQUEST_NONCE_LEN]), i64>,
+    /// When [`Requests::check`] next forgets what has run out.
+    next_prune_ns: i64,
 }
 
 impl Requests {
     /// A check that trusts grants signed by `issuer`, for a peer that first
-    /// read the home's clock at `started_ns`. A request signed before then is
-    /// refused, and so is every request until the revocations have had their
-    /// first answer ([`Requests::revocations`]).
+    /// read the home's clock at `started_ns`. A request signed before then,
+    /// or within [`START_GUARD_NS`] after, is refused, and so is every
+    /// request until the revocations have had their first answer
+    /// ([`Requests::revocations`]).
     pub fn new(issuer: IssuerKey, started_ns: i64) -> Self {
         Requests {
             revocations: Revocations::new(issuer.clone()),
             issuer,
             started_ns,
             seen: HashMap::new(),
+            next_prune_ns: i64::MIN,
         }
     }
 
@@ -266,10 +312,12 @@ impl Requests {
             return Err(Refusal::NotReady);
         }
         let verified = grant.check(&self.issuer, target, now_ns)?;
-        if holder.time_ns.abs_diff(now_ns) > REQUEST_WINDOW_NS as u64 {
+        if holder.time_ns < now_ns.saturating_sub(REQUEST_WINDOW_NS)
+            || holder.time_ns > now_ns.saturating_add(REQUEST_AHEAD_NS)
+        {
             return Err(Refusal::OutsideWindow);
         }
-        if holder.time_ns < self.started_ns {
+        if holder.time_ns <= self.started_ns.saturating_add(START_GUARD_NS) {
             return Err(Refusal::BeforeStart);
         }
         let key =
@@ -282,7 +330,9 @@ impl Requests {
             return Err(Refusal::Revoked);
         }
 
-        self.prune(now_ns);
+        if now_ns >= self.next_prune_ns {
+            self.prune(now_ns);
+        }
         let forget_at = holder
             .time_ns
             .saturating_add(REQUEST_WINDOW_NS + NONCE_MARGIN_NS);
@@ -296,13 +346,18 @@ impl Requests {
     }
 
     /// Forgets nonces whose requests can no longer pass the window, even after
-    /// the clock steps back by up to [`NONCE_MARGIN_NS`]. [`check`]
-    /// does this as it goes; a peer may also call it when idle.
+    /// the clock steps back by up to [`NONCE_MARGIN_NS`], and revocations
+    /// that have run out. [`check`] does this as it goes, at most once a
+    /// second; a peer may also call it when idle.
+    ///
+    /// Keeping a nonce past its time changes no answer: its request fails the
+    /// window before the record is consulted.
     ///
     /// [`check`]: Requests::check
     pub fn prune(&mut self, now_ns: i64) {
         self.seen.retain(|_, forget_at| now_ns <= *forget_at);
         self.revocations.prune(now_ns);
+        self.next_prune_ns = now_ns.saturating_add(PRUNE_EVERY_NS);
     }
 
     /// How many nonces are kept.

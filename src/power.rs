@@ -6,8 +6,12 @@
 //! awake for ever. A member asleep shows as [`Health::Asleep`] in the graph,
 //! and as [`Health::Online`] once it is up.
 //!
-//! A hold's id is all it takes to renew or release the hold, so keep it as
-//! you would a credential.
+//! A hold's id is not a secret: on the mesh, a node that forwards a `Renew` or
+//! a `Release` sees it. So a brain serving power to callers on the mesh binds
+//! each hold to the holder that asked for it, and answers anyone else's
+//! `Renew` or `Release` with [`PowerError::UnknownHold`], as if there were no
+//! such hold, so the answer does not tell them one exists. Only a brain that
+//! serves power to its own components alone treats the id as a bearer handle.
 //!
 //! [`Health::Asleep`]: crate::registry::Health::Asleep
 //! [`Health::Online`]: crate::registry::Health::Online

@@ -33,6 +33,10 @@ fn target(node: &NodeId) -> Target<'_> {
 }
 
 fn grant() -> Grant {
+    grant_expiring(NOW + 120 * SECOND)
+}
+
+fn grant_expiring(expires_ns: i64) -> Grant {
     let mut grant = Grant {
         principal: Some(PrincipalId {
             bytes: b"owner".to_vec(),
@@ -43,7 +47,7 @@ fn grant() -> Grant {
         scope: Some(Scope::OwnerPrivate),
         holder_key: Some(holder().public().to_vec()),
         grant_id: Some(vec![1; 16]),
-        expires_utc_ns: Some(NOW + 120 * SECOND),
+        expires_utc_ns: Some(expires_ns),
         issued_epoch: Some(vec![2; 8]),
         max_lifetime_ns: Some(MAX_GRANT_LIFETIME_NS),
         signature: None,
@@ -96,7 +100,7 @@ fn requests() -> Requests {
 }
 
 fn digest() -> RequestDigest {
-    RequestDigest::of("registry/1.WatchNodes", &[0xa0])
+    RequestDigest::of("registry/1.Watch", &[0xa0])
 }
 
 fn signed(time_ns: i64, nonce: u8) -> HolderSignature {
@@ -156,21 +160,22 @@ fn the_signed_layout_is_the_documented_one() {
         .verify_strict(&expected, &Signature::from_bytes(&signature.signature))
         .expect("the holder signs the documented bytes");
 
-    let mut body = 21u32.to_le_bytes().to_vec();
-    body.extend_from_slice(b"registry/1.WatchNodes");
+    let mut body = 16u32.to_le_bytes().to_vec();
+    body.extend_from_slice(b"registry/1.Watch");
     body.push(0xa0);
     let expected_digest: [u8; 32] = Sha256::digest(&body).into();
     assert_eq!(digest().0, expected_digest);
 }
 
 #[test]
-fn the_window_is_thirty_seconds_either_way() {
+fn the_window_is_thirty_seconds_behind_and_two_ahead() {
     let node = node();
     for (signed_at, passes) in [
         (NOW - 30 * SECOND, true),
-        (NOW + 30 * SECOND, true),
+        (NOW + 2 * SECOND, true),
         (NOW - 30 * SECOND - 1, false),
-        (NOW + 30 * SECOND + 1, false),
+        (NOW + 2 * SECOND + 1, false),
+        (NOW + 30 * SECOND, false),
     ] {
         let result = requests().check(
             &grant(),
@@ -188,28 +193,65 @@ fn the_window_is_thirty_seconds_either_way() {
 }
 
 #[test]
-fn a_request_signed_before_the_peer_started_is_refused() {
+fn a_request_signed_before_the_guard_after_the_start_is_refused() {
     let node = node();
     let mut requests = requests();
-    assert_eq!(
-        requests.check(
-            &grant(),
-            &target(&node),
-            &digest(),
-            &signed(STARTED - 1, 1),
-            STARTED + SECOND
-        ),
-        Err(Refusal::BeforeStart)
-    );
+    let now = STARTED + 5 * SECOND;
+    for refused in [STARTED - 1, STARTED, STARTED + START_GUARD_NS] {
+        assert_eq!(
+            requests.check(
+                &grant(),
+                &target(&node),
+                &digest(),
+                &signed(refused, 1),
+                now
+            ),
+            Err(Refusal::BeforeStart),
+            "{}",
+            refused - STARTED
+        );
+    }
     assert!(requests
         .check(
             &grant(),
             &target(&node),
             &digest(),
-            &signed(STARTED, 1),
-            STARTED + SECOND
+            &signed(STARTED + START_GUARD_NS + 1, 1),
+            now
         )
         .is_ok());
+}
+
+#[test]
+fn a_request_taken_before_a_restart_is_refused_after_it() {
+    let node = node();
+    // The peer takes a request signed as far ahead as it may be.
+    let signature = signed(NOW + REQUEST_AHEAD_NS, 1);
+    requests()
+        .check(&grant(), &target(&node), &digest(), &signature, NOW)
+        .unwrap();
+    // It restarts, losing its record of nonces. Its first reading after the
+    // restart is later than NOW, or earlier by up to the margin.
+    for started in [NOW - NONCE_MARGIN_NS, NOW, NOW + SECOND / 2, NOW + SECOND] {
+        let mut restarted = Requests::new(
+            IssuerKey::from_bytes(&issuer().verifying_key().to_bytes()).unwrap(),
+            started,
+        );
+        restarted.revocations().answer(&list(vec![], 0)).unwrap();
+        // Replayed at any moment from then on, the request is refused.
+        let mut now = started;
+        while now <= signature.time_ns + REQUEST_WINDOW_NS + SECOND {
+            assert!(
+                restarted
+                    .check(&grant(), &target(&node), &digest(), &signature, now)
+                    .is_err(),
+                "started {} ns after, replayed {} ns after",
+                started - NOW,
+                now - NOW
+            );
+            now += SECOND / 4;
+        }
+    }
 }
 
 #[test]
@@ -217,7 +259,7 @@ fn a_changed_request_does_not_verify() {
     let node = node();
     let signature = signed(NOW, 1);
     for other in [
-        RequestDigest::of("registry/1.WatchNodes", &[0xa1]),
+        RequestDigest::of("registry/1.Watch", &[0xa1]),
         RequestDigest::of("power/1.Wake", &[0xa0]),
     ] {
         assert_eq!(
@@ -322,6 +364,26 @@ fn nonces_are_kept_only_while_their_requests_could_pass() {
 }
 
 #[test]
+fn checking_forgets_nonces_that_have_run_out() {
+    let node = node();
+    let mut requests = requests();
+    requests
+        .check(&grant(), &target(&node), &digest(), &signed(NOW, 1), NOW)
+        .unwrap();
+    let later = NOW + REQUEST_WINDOW_NS + NONCE_MARGIN_NS + 1;
+    requests
+        .check(
+            &grant(),
+            &target(&node),
+            &digest(),
+            &signed(later, 2),
+            later,
+        )
+        .unwrap();
+    assert_eq!(requests.remembered(), 1);
+}
+
+#[test]
 fn a_clock_that_steps_back_does_not_reopen_a_spent_nonce() {
     let node = node();
     let mut requests = requests();
@@ -379,6 +441,36 @@ fn a_revoked_principals_grant_serves_nothing() {
         requests.remembered(),
         0,
         "a refused request records nothing"
+    );
+}
+
+#[test]
+fn a_revocation_outlasts_a_deadline_past_the_lifetime() {
+    let node = node();
+    let revoked = NOW;
+    // The issuer set the deadline 25 s past the lifetime: within the slack,
+    // so the grant passes its check when presented as the principal is
+    // revoked.
+    let grant = grant_expiring(revoked + MAX_GRANT_LIFETIME_NS + 25 * SECOND);
+    let mut requests = requests();
+    requests
+        .check(
+            &grant,
+            &target(&node),
+            &digest(),
+            &signed(revoked, 1),
+            revoked,
+        )
+        .unwrap();
+    requests
+        .revocations()
+        .revoked(&revocation(revoked))
+        .unwrap();
+    // Past the revocation's `until_ns`, before the grant's deadline.
+    let late = revoked + MAX_GRANT_LIFETIME_NS + 10 * SECOND;
+    assert_eq!(
+        requests.check(&grant, &target(&node), &digest(), &signed(late, 2), late),
+        Err(Refusal::Revoked)
     );
 }
 

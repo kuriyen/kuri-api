@@ -22,7 +22,7 @@ const STARTED: i64 = 1_800_000_000_000_000_000;
 const NOW: i64 = STARTED + 100_000_000_000;
 const SECOND: i64 = 1_000_000_000;
 const PATH: &str = "tests/vectors/requests.json";
-const METHOD: &str = "registry/1.WatchNodes";
+const METHOD: &str = "registry/1.Watch";
 const BODY: &[u8] = &[0xa0];
 
 fn issuer() -> SigningKey {
@@ -149,17 +149,28 @@ fn cases() -> Vec<Case> {
             "signed 30 seconds and a nanosecond ago",
             signed(NOW - 30 * SECOND - 1),
         ),
-        case("signed 30 seconds ahead", signed(NOW + 30 * SECOND)),
+        case("signed 2 seconds ahead", signed(NOW + 2 * SECOND)),
+        case(
+            "signed 2 seconds and a nanosecond ahead",
+            signed(NOW + 2 * SECOND + 1),
+        ),
+        Case {
+            now_ns: STARTED + 10 * SECOND,
+            ..case("signed before the peer started", signed(STARTED - SECOND))
+        },
         Case {
             now_ns: STARTED + 10 * SECOND,
             ..case(
-                "signed a nanosecond before the peer started",
-                signed(STARTED - 1),
+                "signed 4 seconds after the peer started",
+                signed(STARTED + 4 * SECOND),
             )
         },
         Case {
             now_ns: STARTED + 10 * SECOND,
-            ..case("signed as the peer started", signed(STARTED))
+            ..case(
+                "signed 4 seconds and a nanosecond after the peer started",
+                signed(STARTED + 4 * SECOND + 1),
+            )
         },
         Case {
             body: &[0xa1, 0x61, 0x78, 0x01],
@@ -271,7 +282,7 @@ fn every_vector_holds() {
         instance: file["target"]["instance"].as_str().unwrap(),
     };
     let cases = file["cases"].as_array().unwrap();
-    assert!(cases.len() >= 12);
+    assert!(cases.len() >= 14);
     for case in cases {
         let name = case["name"].as_str().unwrap();
         let body = unhex(case["body"].as_str().unwrap());

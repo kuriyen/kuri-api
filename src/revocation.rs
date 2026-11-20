@@ -14,8 +14,10 @@
 //! || i64le(until_ns)
 //! ```
 //!
-//! A provider keeps each revoked principal until `until_ns`, and until then
-//! refuses every request whose grant names it ([`Revocations`]).
+//! A provider keeps each revoked principal until `until_ns`, and at least
+//! until `revoked_ns` plus the longest lifetime and the deadline's slack
+//! ([`DEADLINE_SLACK_NS`]), and until then refuses every request whose grant
+//! names it ([`Revocations`]).
 //!
 //! # Finding one that was missed
 //!
@@ -52,7 +54,9 @@ use std::collections::HashMap;
 use ed25519_dalek::Signature;
 use serde::{Deserialize, Serialize};
 
-use crate::grant::{IssuerKey, PrincipalId, MAX_GRANT_LIFETIME_NS, MAX_PRINCIPAL_LEN};
+use crate::grant::{
+    IssuerKey, PrincipalId, DEADLINE_SLACK_NS, MAX_GRANT_LIFETIME_NS, MAX_PRINCIPAL_LEN,
+};
 
 /// Prefixes the bytes the issuer signs for a revocation.
 pub const REVOKE_CONTEXT: &[u8] = b"kuri-api.Revoke/v1\0";
@@ -197,13 +201,18 @@ impl Revocations {
     }
 
     /// Keeps a verified revocation. It lasts until `until_ns`, and at least
-    /// until every grant issued before it has expired: a signed revocation
+    /// until every grant issued before it has expired: its time plus
+    /// [`MAX_GRANT_LIFETIME_NS`] and [`DEADLINE_SLACK_NS`], since a grant
+    /// whose deadline overshoots by the slack still passes
+    /// [`Grant::check`](crate::grant::Grant::check). A signed revocation
     /// whose `until_ns` is short of that is kept the longer time rather than
     /// refused, since refusing it would leave the principal unrevoked.
     fn keep(&mut self, revocation: &Revocation) {
-        let lasts = revocation
-            .until_ns
-            .max(revocation.revoked_ns.saturating_add(MAX_GRANT_LIFETIME_NS));
+        let lasts = revocation.until_ns.max(
+            revocation
+                .revoked_ns
+                .saturating_add(MAX_GRANT_LIFETIME_NS + DEADLINE_SLACK_NS),
+        );
         let until = self
             .revoked
             .entry(revocation.principal.bytes.clone())

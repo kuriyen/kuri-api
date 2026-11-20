@@ -68,11 +68,17 @@ fn a_revoked_principal_stays_revoked_until_its_grants_have_expired() {
     revocations
         .answer(&list(vec![revocation("guest", T)], T))
         .unwrap();
+    // A grant's deadline may overshoot the lifetime by the slack and still
+    // pass its check, so the revocation lasts that much longer than its
+    // `until_ns`.
+    let end = T + MAX_GRANT_LIFETIME_NS + DEADLINE_SLACK_NS;
     assert!(revocations.is_revoked(&principal("guest"), T));
-    assert!(revocations.is_revoked(&principal("guest"), T + MAX_GRANT_LIFETIME_NS - 1));
-    assert!(!revocations.is_revoked(&principal("guest"), T + MAX_GRANT_LIFETIME_NS));
+    assert!(revocations.is_revoked(&principal("guest"), end - 1));
+    assert!(!revocations.is_revoked(&principal("guest"), end));
     assert!(!revocations.is_revoked(&principal("owner"), T));
-    revocations.prune(T + MAX_GRANT_LIFETIME_NS);
+    revocations.prune(end - 1);
+    assert_eq!(revocations.len(), 1);
+    revocations.prune(end);
     assert!(revocations.is_empty());
 }
 
@@ -189,7 +195,10 @@ fn a_short_until_is_kept_for_the_whole_lifetime() {
         until_ns,
     };
     revocations.revoked(&short).unwrap();
-    assert!(revocations.is_revoked(&principal, T + MAX_GRANT_LIFETIME_NS - 1));
+    assert!(revocations.is_revoked(
+        &principal,
+        T + MAX_GRANT_LIFETIME_NS + DEADLINE_SLACK_NS - 1
+    ));
 }
 
 #[test]
