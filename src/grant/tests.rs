@@ -335,3 +335,49 @@ fn enum_numbers_and_names_are_the_contracts() {
         GrantError::UntrustedSignature
     );
 }
+
+#[test]
+fn without_the_clock_everything_but_the_deadline_is_checked() {
+    let node = node();
+    let target = target(&node);
+    let grant = signed();
+    let deadline = NOW + 60_000_000_000;
+
+    // Past its deadline, or with it further off than a grant can live: only
+    // the check with the clock can tell.
+    assert_eq!(
+        grant.check(&issuer_key(), &target, deadline),
+        Err(Rejection::Expired)
+    );
+    assert_eq!(
+        grant.check_without_clock(&issuer_key(), &target),
+        grant.check(&issuer_key(), &target, NOW)
+    );
+
+    // Everything else it refuses as the check with the clock does.
+    let mut forged = grant.clone();
+    forged.scope = Some(Scope::BroodShared);
+    assert_eq!(
+        forged.check_without_clock(&issuer_key(), &target),
+        Err(Rejection::BadSignature)
+    );
+    let other = NodeId {
+        bytes: b"another-node".to_vec(),
+    };
+    assert_eq!(
+        grant.check_without_clock(
+            &issuer_key(),
+            &super::Target {
+                node: &other,
+                ..target
+            }
+        ),
+        Err(Rejection::WrongTarget)
+    );
+    let mut undated = unsigned();
+    undated.expires_utc_ns = None;
+    assert_eq!(
+        sign(undated).check_without_clock(&issuer_key(), &target),
+        Err(Rejection::Malformed(Malformed("expires_utc_ns")))
+    );
+}

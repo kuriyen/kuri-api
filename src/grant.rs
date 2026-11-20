@@ -423,6 +423,31 @@ impl Grant {
         target: &Target<'_>,
         now_ns: i64,
     ) -> Result<Verified, Rejection> {
+        let verified = self.check_without_clock(issuer, target)?;
+        if now_ns >= verified.expires_ns {
+            return Err(Rejection::Expired);
+        }
+        if verified.expires_ns > now_ns.saturating_add(MAX_GRANT_LIFETIME_NS + DEADLINE_SLACK_NS) {
+            return Err(Rejection::DeadlineTooFar);
+        }
+        Ok(verified)
+    }
+
+    /// [`Grant::check`] without its deadline: the grant is well formed, the
+    /// issuer signed it, and it names `target`.
+    ///
+    /// For a provider that has not read the home's clock yet, and so cannot
+    /// tell whether the deadline has passed. Such a provider bounds the grant
+    /// instead by `max_lifetime_ns` from its own first sight of it, which this
+    /// check has verified is signed and between 1 ns and
+    /// [`MAX_GRANT_LIFETIME_NS`]. That bound does not stop a grant held back
+    /// unpresented, so a provider uses [`Grant::check`] as soon as it has the
+    /// clock.
+    pub fn check_without_clock(
+        &self,
+        issuer: &IssuerKey,
+        target: &Target<'_>,
+    ) -> Result<Verified, Rejection> {
         let fields = Fields::of(self)?;
         let expires_ns = fields.expires_utc_ns.ok_or(Malformed("expires_utc_ns"))?;
         let signature = self
@@ -441,12 +466,6 @@ impl Grant {
             || fields.instance != target.instance
         {
             return Err(Rejection::WrongTarget);
-        }
-        if now_ns >= expires_ns {
-            return Err(Rejection::Expired);
-        }
-        if expires_ns > now_ns.saturating_add(MAX_GRANT_LIFETIME_NS + DEADLINE_SLACK_NS) {
-            return Err(Rejection::DeadlineTooFar);
         }
         Ok(Verified {
             principal: PrincipalId {
