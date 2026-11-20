@@ -1,5 +1,15 @@
 # Changelog
 
+## 0.1.2 — 2026-11-20
+
+- `Grant::check_without_clock`: the grant check without its deadline, for a
+  provider that has not read the home's clock yet. It returns a `Genuine`
+  grant, which carries `max_lifetime_ns`; such a provider bounds the grant by
+  that from its first sight instead. `Genuine::at` checks the deadline and
+  gives the `Verified` grant, so `Grant::check` is `check_without_clock`
+  followed by `at`.
+- Documentation: a revocation's `until_ns` includes `DEADLINE_SLACK_NS`.
+
 ## 0.1.1 — 2026-11-20
 
 - Holder-signed requests: a request's time may be at most 2 seconds ahead of
