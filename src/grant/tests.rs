@@ -343,16 +343,25 @@ fn without_the_clock_everything_but_the_deadline_is_checked() {
     let grant = signed();
     let deadline = NOW + 60_000_000_000;
 
+    // Genuine, with the lifetime that bounds it until the provider has the
+    // clock, and the deadline still to be checked.
+    let genuine = grant.check_without_clock(&issuer_key(), &target).unwrap();
+    assert_eq!(genuine.max_lifetime_ns, 60_000_000_000);
+    assert_eq!(genuine.expires_ns, deadline);
+
     // Past its deadline, or with it further off than a grant can live: only
-    // the check with the clock can tell.
+    // the check with the clock can tell, and it is the same check.
+    assert_eq!(genuine.clone().at(deadline), Err(Rejection::Expired));
     assert_eq!(
         grant.check(&issuer_key(), &target, deadline),
         Err(Rejection::Expired)
     );
+    let too_early = deadline - MAX_GRANT_LIFETIME_NS - DEADLINE_SLACK_NS - 1;
     assert_eq!(
-        grant.check_without_clock(&issuer_key(), &target),
-        grant.check(&issuer_key(), &target, NOW)
+        genuine.clone().at(too_early),
+        Err(Rejection::DeadlineTooFar)
     );
+    assert_eq!(genuine.at(NOW), grant.check(&issuer_key(), &target, NOW));
 
     // Everything else it refuses as the check with the clock does.
     let mut forged = grant.clone();

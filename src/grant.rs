@@ -298,6 +298,48 @@ pub struct Verified {
     pub expires_ns: i64,
 }
 
+/// A grant that passed [`Grant::check_without_clock`]: well formed, signed by
+/// the issuer, and naming the target, with its deadline not yet checked.
+/// [`Genuine::at`] checks it, and only then is the grant [`Verified`].
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct Genuine {
+    /// Who the grant was issued to.
+    pub principal: PrincipalId,
+    /// The grant's id.
+    pub grant_id: Vec<u8>,
+    /// The key the holder must prove it has.
+    pub holder_key: [u8; HOLDER_KEY_LEN],
+    /// The scope granted.
+    pub scope: Scope,
+    /// The deadline on the home's clock, not yet checked against it.
+    pub expires_ns: i64,
+    /// How long the grant may serve from a provider's first sight of it:
+    /// between 1 ns and [`MAX_GRANT_LIFETIME_NS`]. What bounds the grant at a
+    /// provider that has not read the home's clock.
+    pub max_lifetime_ns: i64,
+}
+
+impl Genuine {
+    /// Checks the deadline at `now_ns` on the home's clock: it has not
+    /// passed, and it is no later than `now_ns` plus [`MAX_GRANT_LIFETIME_NS`]
+    /// and [`DEADLINE_SLACK_NS`].
+    pub fn at(self, now_ns: i64) -> Result<Verified, Rejection> {
+        if now_ns >= self.expires_ns {
+            return Err(Rejection::Expired);
+        }
+        if self.expires_ns > now_ns.saturating_add(MAX_GRANT_LIFETIME_NS + DEADLINE_SLACK_NS) {
+            return Err(Rejection::DeadlineTooFar);
+        }
+        Ok(Verified {
+            principal: self.principal,
+            grant_id: self.grant_id,
+            holder_key: self.holder_key,
+            scope: self.scope,
+            expires_ns: self.expires_ns,
+        })
+    }
+}
+
 /// Every field the signature covers, checked against the contract's bounds.
 struct Fields<'a> {
     principal: &'a [u8],
@@ -423,14 +465,7 @@ impl Grant {
         target: &Target<'_>,
         now_ns: i64,
     ) -> Result<Verified, Rejection> {
-        let verified = self.check_without_clock(issuer, target)?;
-        if now_ns >= verified.expires_ns {
-            return Err(Rejection::Expired);
-        }
-        if verified.expires_ns > now_ns.saturating_add(MAX_GRANT_LIFETIME_NS + DEADLINE_SLACK_NS) {
-            return Err(Rejection::DeadlineTooFar);
-        }
-        Ok(verified)
+        self.check_without_clock(issuer, target)?.at(now_ns)
     }
 
     /// [`Grant::check`] without its deadline: the grant is well formed, the
@@ -438,16 +473,15 @@ impl Grant {
     ///
     /// For a provider that has not read the home's clock yet, and so cannot
     /// tell whether the deadline has passed. Such a provider bounds the grant
-    /// instead by `max_lifetime_ns` from its own first sight of it, which this
-    /// check has verified is signed and between 1 ns and
-    /// [`MAX_GRANT_LIFETIME_NS`]. That bound does not stop a grant held back
-    /// unpresented, so a provider uses [`Grant::check`] as soon as it has the
-    /// clock.
+    /// instead by [`Genuine::max_lifetime_ns`] from its own first sight of it.
+    /// That bound does not stop a grant held back unpresented, so a provider
+    /// checks the deadline with [`Genuine::at`], or uses [`Grant::check`], as
+    /// soon as it has the clock.
     pub fn check_without_clock(
         &self,
         issuer: &IssuerKey,
         target: &Target<'_>,
-    ) -> Result<Verified, Rejection> {
+    ) -> Result<Genuine, Rejection> {
         let fields = Fields::of(self)?;
         let expires_ns = fields.expires_utc_ns.ok_or(Malformed("expires_utc_ns"))?;
         let signature = self
@@ -467,7 +501,7 @@ impl Grant {
         {
             return Err(Rejection::WrongTarget);
         }
-        Ok(Verified {
+        Ok(Genuine {
             principal: PrincipalId {
                 bytes: fields.principal.to_vec(),
             },
@@ -475,6 +509,7 @@ impl Grant {
             holder_key: fields.holder_key,
             scope: fields.scope,
             expires_ns,
+            max_lifetime_ns: fields.max_lifetime_ns,
         })
     }
 }
