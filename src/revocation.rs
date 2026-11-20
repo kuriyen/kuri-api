@@ -3,9 +3,9 @@
 //! A grant serves request after request until its deadline, and a mesh has
 //! no channel to tear down, so when a principal is revoked the issuer tells
 //! the providers. A revocation names the principal, its time on the home's
-//! clock, and `until_ns`, that time plus the longest grant lifetime, after
-//! which no grant issued before it is valid. It is signed by the key that
-//! signs grants:
+//! clock, and `until_ns`, that time plus the longest grant lifetime and the
+//! deadline's slack ([`DEADLINE_SLACK_NS`]), after which no grant issued
+//! before it is valid. It is signed by the key that signs grants:
 //!
 //! ```text
 //! "kuri-api.Revoke/v1\0"
@@ -75,8 +75,8 @@ pub struct Revocation {
     pub principal: PrincipalId,
     /// When, on the home's clock.
     pub revoked_ns: i64,
-    /// `revoked_ns` plus the longest grant lifetime: when every grant issued
-    /// before the revocation has expired anyway.
+    /// `revoked_ns` plus the longest grant lifetime and [`DEADLINE_SLACK_NS`]:
+    /// when every grant issued before the revocation has expired anyway.
     pub until_ns: i64,
     /// The issuer's signature over [`Revocation::signed_bytes`].
     #[serde(with = "serde_bytes")]
