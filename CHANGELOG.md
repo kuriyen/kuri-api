@@ -1,5 +1,23 @@
 # Changelog
 
+## 0.1.1 — 2026-11-20
+
+- Holder-signed requests: a request's time may be at most 2 seconds ahead of
+  the peer's reading of the home's clock (`REQUEST_AHEAD_NS`), and still
+  30 seconds behind; a peer refuses requests signed up to 4 seconds after it
+  started (`START_GUARD_NS`). In 0.1.0 a request could be 30 seconds ahead,
+  and one signed ahead could pass a second time at a peer that restarted
+  before its time.
+- Revocations last for `DEADLINE_SLACK_NS` past the longest grant lifetime,
+  so a grant whose deadline overshoots by up to the slack does not outlive
+  its principal's revocation.
+- `Requests::check` forgets expired nonces at most once a second instead of
+  on every request.
+- `rust-version` is 1.88, which `sha2` 0.11.1 needs; 0.1.0 claimed 1.85.
+- Documentation: a hold's id is not a secret, and a hold is bound to its
+  holder; what `max_lifetime_ns` is for; method examples use
+  `registry/1.Watch`. The request vectors follow the new rules.
+
 ## 0.1.0 — 2026-11-14
 
 - Grants: `Grant`, `GrantRequest` and `GrantError`, and `Grant::check`, the
