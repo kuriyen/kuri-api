@@ -10,6 +10,10 @@
     "MAX_LINKS": 8,
     "MAX_NODES": 24,
     "MAX_NODE_EVENTS": 8,
+    "MAX_ROUND_TRIP_NS": 1000000000,
+    "READ_EVERY_NS": 600000000000,
+    "REVOKE_HEARTBEAT_EVERY_NS": 10000000000,
+    "TIME_NONCE_LEN": 16,
     "WATCH_TICK_NS": 10000000000
   },
   "enums": {
@@ -102,6 +106,24 @@
     },
     "RegistryReaderWatchResponse": {
       "events": "Vec<NodeEvent>"
+    },
+    "Revocation": {
+      "principal": "PrincipalId",
+      "revoked_ns": "i64",
+      "signature": "[u8;64]",
+      "until_ns": "i64"
+    },
+    "RevocationList": {
+      "newest": "RevokeHeartbeat",
+      "revocations": "Vec<Revocation>"
+    },
+    "RevokeHeartbeat": {
+      "revoked_ns": "i64",
+      "signature": "[u8;64]"
+    },
+    "TimeAnswer": {
+      "signature": "[u8;64]",
+      "utc_ns": "i64"
     }
   },
   "tables": {

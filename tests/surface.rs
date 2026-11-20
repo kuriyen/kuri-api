@@ -10,6 +10,7 @@
 use std::collections::BTreeMap;
 use std::path::Path;
 
+use kuri_api::clock::{TimeAnswer, MAX_ROUND_TRIP_NS, READ_EVERY_NS, TIME_NONCE_LEN};
 use kuri_api::grant::{Grant, GrantError, GrantRequest, PrincipalId, MAX_GRANT_LIFETIME_NS};
 use kuri_api::power::{
     PowerError, PowerHoldRequest, PowerHoldResponse, PowerReleaseRequest, PowerRenewRequest,
@@ -20,6 +21,9 @@ use kuri_api::registry::{
     LinkKind, NodeEvent, NodeId, NodeState, Rdma, RegistryError, RegistryReaderWatchResponse,
     Scope, MAX_ACCELERATORS, MAX_CAPABILITIES, MAX_COMPUTE_CAPABILITIES, MAX_LINKS, MAX_NODES,
     MAX_NODE_EVENTS, WATCH_TICK_NS,
+};
+use kuri_api::revocation::{
+    Revocation, RevocationList, RevokeHeartbeat, REVOKE_HEARTBEAT_EVERY_NS,
 };
 use serde::Serialize;
 use serde_json::{json, Value};
@@ -133,6 +137,22 @@ fn node_state() -> NodeState {
         announcement: Some(announcement()),
         health: Some(Health::Online),
         last_seen_monotonic_ns: Some(0),
+    }
+}
+
+fn revocation() -> Revocation {
+    Revocation {
+        principal: PrincipalId::default(),
+        revoked_ns: 0,
+        until_ns: 0,
+        signature: [0; 64],
+    }
+}
+
+fn heartbeat() -> RevokeHeartbeat {
+    RevokeHeartbeat {
+        revoked_ns: 0,
+        signature: [0; 64],
     }
 }
 
@@ -277,6 +297,51 @@ fn build() -> String {
     let structs: BTreeMap<&str, BTreeMap<String, String>> = BTreeMap::from([
         ("NodeId", shape!(node(), NodeId { bytes })),
         (
+            "TimeAnswer",
+            shape!(
+                TimeAnswer {
+                    utc_ns: 0,
+                    signature: [0; 64]
+                },
+                TimeAnswer { utc_ns, signature }
+            ),
+        ),
+        (
+            "Revocation",
+            shape!(
+                revocation(),
+                Revocation {
+                    principal,
+                    revoked_ns,
+                    until_ns,
+                    signature
+                }
+            ),
+        ),
+        (
+            "RevokeHeartbeat",
+            shape!(
+                heartbeat(),
+                RevokeHeartbeat {
+                    revoked_ns,
+                    signature
+                }
+            ),
+        ),
+        (
+            "RevocationList",
+            shape!(
+                RevocationList {
+                    revocations: vec![revocation()],
+                    newest: heartbeat()
+                },
+                RevocationList {
+                    revocations,
+                    newest
+                }
+            ),
+        ),
+        (
             "PrincipalId",
             shape!(PrincipalId::default(), PrincipalId { bytes }),
         ),
@@ -376,6 +441,10 @@ fn build() -> String {
         ("MAX_LINKS", MAX_LINKS as i64),
         ("MAX_NODES", MAX_NODES as i64),
         ("MAX_NODE_EVENTS", MAX_NODE_EVENTS as i64),
+        ("MAX_ROUND_TRIP_NS", MAX_ROUND_TRIP_NS),
+        ("READ_EVERY_NS", READ_EVERY_NS),
+        ("REVOKE_HEARTBEAT_EVERY_NS", REVOKE_HEARTBEAT_EVERY_NS),
+        ("TIME_NONCE_LEN", TIME_NONCE_LEN as i64),
         ("WATCH_TICK_NS", WATCH_TICK_NS),
     ]);
     let mut file = json!({
