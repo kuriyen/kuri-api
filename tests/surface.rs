@@ -30,7 +30,13 @@ const PATH: &str = "tests/surface.json";
 /// present are all its fields.
 fn fields<T: Serialize>(value: &T) -> Vec<String> {
     match serde_json::to_value(value).unwrap() {
-        Value::Object(map) => map.keys().cloned().collect(),
+        Value::Object(map) => {
+            // Sorted, as the keys of a `BTreeMap` are, whether or not
+            // serde_json's `preserve_order` is on.
+            let mut keys: Vec<String> = map.keys().cloned().collect();
+            keys.sort();
+            keys
+        }
         other => panic!("not a map: {other}"),
     }
 }
@@ -372,7 +378,7 @@ fn build() -> String {
         ("MAX_NODE_EVENTS", MAX_NODE_EVENTS as i64),
         ("WATCH_TICK_NS", WATCH_TICK_NS),
     ]);
-    let file = json!({
+    let mut file = json!({
         "about": "What this crate mirrors of the contracts' definition, generated from its types: tables and structs with their fields and each field's Rust type, enums with their members' names and numbers, unions with their members' names, constants with their values. Names are this crate's; enum members are in their wire form.",
         "tables": tables,
         "structs": structs,
@@ -380,6 +386,9 @@ fn build() -> String {
         "unions": unions,
         "consts": consts,
     });
+    // Keys in sorted order, whether or not serde_json's `preserve_order` is
+    // on, as it is wherever a crate in the same build enables it.
+    file.sort_all_objects();
     serde_json::to_string_pretty(&file).unwrap() + "\n"
 }
 

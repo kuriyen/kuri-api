@@ -9,6 +9,9 @@
   gives the `Verified` grant, so `Grant::check` is `check_without_clock`
   followed by `at`.
 - Documentation: a revocation's `until_ns` includes `DEADLINE_SLACK_NS`.
+- Tests: the vector files are generated the same in a build where
+  serde_json's `preserve_order` is on, as it is in the Fuchsia tree, and CI
+  runs the tests that way too.
 
 ## 0.1.1 — 2026-11-20
 

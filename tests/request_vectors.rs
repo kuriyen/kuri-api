@@ -236,7 +236,7 @@ fn build() -> String {
             })
         })
         .collect();
-    let file = json!({
+    let mut file = json!({
         "about": "Requests signed by a grant's holder (the holder signature as CBOR, hex), each checked by a fresh peer that started at started_ns, with the result it must reach. With twice set, the result is the second check of the same request.",
         "issuer_key": hex(&issuer_key.to_bytes()),
         "grant": hex(&to_cbor(&grant()).unwrap()),
@@ -244,6 +244,9 @@ fn build() -> String {
         "started_ns": STARTED,
         "cases": cases,
     });
+    // Keys in sorted order, whether or not serde_json's `preserve_order` is
+    // on, as it is wherever a crate in the same build enables it.
+    file.sort_all_objects();
     serde_json::to_string_pretty(&file).unwrap() + "\n"
 }
 

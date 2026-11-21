@@ -211,11 +211,14 @@ fn build() -> String {
             })
         })
         .collect();
-    let file = json!({
+    let mut file = json!({
         "about": "Grants as they travel (CBOR, hex), each with the result a provider's offline check must reach. `signed_bytes` is null where the grant is malformed.",
         "issuer_key": hex(&issuer_key.to_bytes()),
         "cases": cases,
     });
+    // Keys in sorted order, whether or not serde_json's `preserve_order` is
+    // on, as it is wherever a crate in the same build enables it.
+    file.sort_all_objects();
     serde_json::to_string_pretty(&file).unwrap() + "\n"
 }
 

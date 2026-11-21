@@ -49,6 +49,11 @@ jobs:
       - name: Tests
         run: cargo test --offline --locked
 
+      # A build that also holds a crate enabling serde_json's `preserve_order`,
+      # as the Fuchsia tree does, must generate the same vector files.
+      - name: Tests, with serde_json's preserve_order
+        run: cargo test --offline --locked --features serde_json/preserve_order
+
       - name: Docs
         run: RUSTDOCFLAGS="-D warnings" cargo doc --offline --locked --no-deps
 
