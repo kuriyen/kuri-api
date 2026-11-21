@@ -13,6 +13,17 @@ pub struct EncodeError(String);
 #[error("could not decode: {0}")]
 pub struct DecodeError(String);
 
+/// The longest message on the home's mesh, in bytes: 64 KiB, as a FIDL
+/// channel message. Each is bounded on its own: a query's payload, a reply's,
+/// a publication's, and an attachment.
+///
+/// A reader checks a message's length against this before it verifies or
+/// decodes it. [`from_cbor`] sets no limit, because it also decodes messages
+/// that are not these contracts', which may be longer. Every message this
+/// crate defines fits with every field at its bound; the tests check that,
+/// so a bound raised past it fails them.
+pub const MAX_MESSAGE_BYTES: usize = 64 * 1024;
+
 /// Encodes `value` as CBOR.
 pub fn to_cbor<T: Serialize>(value: &T) -> Result<Vec<u8>, EncodeError> {
     let mut out = Vec::new();
@@ -25,7 +36,7 @@ pub fn to_cbor<T: Serialize>(value: &T) -> Result<Vec<u8>, EncodeError> {
 /// `bytes` must hold the one value and nothing after it: a writer never
 /// sends more, and bytes left over would hide a framing error, such as two
 /// messages run together. It sets no limit on the size of `bytes`; a reader
-/// bounds that before it decodes.
+/// bounds that before it decodes, as [`MAX_MESSAGE_BYTES`] says.
 pub fn from_cbor<T: DeserializeOwned>(bytes: &[u8]) -> Result<T, DecodeError> {
     let mut rest = bytes;
     let value = ciborium::from_reader(&mut rest).map_err(|e| DecodeError(e.to_string()))?;

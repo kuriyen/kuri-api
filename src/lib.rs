@@ -37,10 +37,20 @@
 //! - **Structs**, a method's request or answer, have every field required.
 //!
 //! Decoding checks the shape, not the definition's bounds: a string, byte
-//! string or list longer than its `MAX_` constant decodes. Every check this
-//! crate runs on a value (a grant, a request, a revocation) refuses one out of
-//! bounds; any other value a reader takes from the network, it bounds itself
-//! with those constants.
+//! string or list longer than its `MAX_` constant decodes, and the value can
+//! take many times its encoded size in memory. So a reader takes a message
+//! from the network in this order:
+//!
+//! 1. it bounds the bytes, by [`MAX_MESSAGE_BYTES`];
+//! 2. where a signature covers the raw bytes, it checks the signature: a
+//!    request's body is in its digest, and a node signs the digest of what
+//!    it replies and publishes;
+//! 3. then it decodes, with [`from_cbor`], which refuses bytes after the
+//!    value.
+//!
+//! Every check this crate runs on a decoded value (a grant, a request, a
+//! revocation) refuses one out of bounds; any other value, the reader bounds
+//! with the `MAX_` constants.
 //!
 //! # Versions
 //!
@@ -62,4 +72,4 @@ pub mod registry;
 pub mod request;
 pub mod revocation;
 
-pub use wire::{from_cbor, to_cbor, DecodeError, EncodeError};
+pub use wire::{from_cbor, to_cbor, DecodeError, EncodeError, MAX_MESSAGE_BYTES};

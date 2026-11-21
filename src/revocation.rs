@@ -68,6 +68,10 @@ pub const REVOKE_HEARTBEAT_CONTEXT: &[u8] = b"kuri-api.RevokeHeartbeat/v1\0";
 /// How often the issuer publishes its heartbeat: every 10 seconds.
 pub const REVOKE_HEARTBEAT_EVERY_NS: i64 = 10_000_000_000;
 
+/// The most revocations in a [`RevocationList`]: the issuer refuses to start
+/// with more principals than this, so every one revoked fits in one answer.
+pub const MAX_REVOCATIONS: usize = 128;
+
 /// A principal revoked: until `until_ns`, no grant naming it is honoured.
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub struct Revocation {
