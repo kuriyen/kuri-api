@@ -1,16 +1,67 @@
 {
-  "about": "What this crate mirrors of the contracts' definition, generated from its types: tables and structs with their fields and each field's Rust type, enums with their members' names and numbers, unions with their members' names, constants with their values. Names are this crate's; enum members are in their wire form.",
+  "about": "What this crate mirrors of the contracts' definition, generated from its types: tables and structs with their fields and each field's Rust type, enums with their members' names and numbers, unions with their members' names and types, constants with their values, and for each bounded field the constant that bounds it. Names are this crate's; enum and union members are in their wire form.",
+  "bounds": {
+    "Accelerator": {
+      "model": "MAX_NAME_LEN"
+    },
+    "Announcement": {
+      "capabilities": "MAX_CAPABILITIES",
+      "label": "MAX_NAME_LEN",
+      "links": "MAX_LINKS"
+    },
+    "Capability": {
+      "instance": "MAX_INSTANCE_LEN"
+    },
+    "Compute": {
+      "accelerators": "MAX_ACCELERATORS"
+    },
+    "Grant": {
+      "grant_id": "MAX_GRANT_ID_LEN",
+      "holder_key": "MAX_HOLDER_KEY_LEN",
+      "instance": "MAX_INSTANCE_LEN",
+      "issued_epoch": "MAX_ISSUED_EPOCH_LEN",
+      "signature": "MAX_SIGNATURE_LEN"
+    },
+    "GrantRequest": {
+      "holder_key": "MAX_HOLDER_KEY_LEN",
+      "instance": "MAX_INSTANCE_LEN"
+    },
+    "Link": {
+      "segment": "MAX_NAME_LEN"
+    },
+    "NodeId": {
+      "bytes": "MAX_NODE_ID_LEN"
+    },
+    "PrincipalId": {
+      "bytes": "MAX_PRINCIPAL_LEN"
+    },
+    "RegistryReaderWatchResponse": {
+      "events": "MAX_NODE_EVENTS"
+    },
+    "RevocationList": {
+      "revocations": "MAX_REVOCATIONS"
+    }
+  },
   "consts": {
     "HOLD_ID_LEN": 16,
     "MAX_ACCELERATORS": 8,
     "MAX_CAPABILITIES": 16,
     "MAX_COMPUTE_CAPABILITIES": 2,
+    "MAX_GRANT_ID_LEN": 32,
     "MAX_GRANT_LIFETIME_NS": 300000000000,
+    "MAX_HOLDER_KEY_LEN": 64,
     "MAX_HOLD_NS": 600000000000,
+    "MAX_INSTANCE_LEN": 64,
+    "MAX_ISSUED_EPOCH_LEN": 32,
     "MAX_LINKS": 8,
+    "MAX_NAME_LEN": 64,
     "MAX_NODES": 24,
     "MAX_NODE_EVENTS": 8,
+    "MAX_NODE_ID_LEN": 64,
+    "MAX_PRINCIPAL_LEN": 64,
+    "MAX_REVOCATIONS": 128,
     "MAX_ROUND_TRIP_NS": 1000000000,
+    "MAX_SIGNATURE_LEN": 512,
     "READ_EVERY_NS": 600000000000,
     "REVOKE_HEARTBEAT_EVERY_NS": 10000000000,
     "TIME_NONCE_LEN": 16,
@@ -182,12 +233,12 @@
     }
   },
   "unions": {
-    "NodeEvent": [
-      "existing",
-      "idle",
-      "added",
-      "changed",
-      "removed"
-    ]
+    "NodeEvent": {
+      "added": "NodeState",
+      "changed": "NodeState",
+      "existing": "NodeState",
+      "idle": "()",
+      "removed": "NodeId"
+    }
   }
 }

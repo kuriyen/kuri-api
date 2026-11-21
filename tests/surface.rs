@@ -1,5 +1,6 @@
 //! The surface this crate mirrors: every table, struct, enum, union and
-//! constant whose definition lives elsewhere, with its members.
+//! constant whose definition lives elsewhere, with its members, and the
+//! constant that bounds each bounded field.
 //!
 //! `tests/surface.json` is generated from the types themselves, so it cannot
 //! drift from them: a test fails if file and generator disagree. The check
@@ -11,7 +12,10 @@ use std::collections::BTreeMap;
 use std::path::Path;
 
 use kuri_api::clock::{TimeAnswer, MAX_ROUND_TRIP_NS, READ_EVERY_NS, TIME_NONCE_LEN};
-use kuri_api::grant::{Grant, GrantError, GrantRequest, PrincipalId, MAX_GRANT_LIFETIME_NS};
+use kuri_api::grant::{
+    Grant, GrantError, GrantRequest, PrincipalId, MAX_GRANT_ID_LEN, MAX_GRANT_LIFETIME_NS,
+    MAX_HOLDER_KEY_LEN, MAX_ISSUED_EPOCH_LEN, MAX_PRINCIPAL_LEN, MAX_SIGNATURE_LEN,
+};
 use kuri_api::power::{
     PowerError, PowerHoldRequest, PowerHoldResponse, PowerReleaseRequest, PowerRenewRequest,
     PowerRenewResponse, PowerWakeRequest, HOLD_ID_LEN, MAX_HOLD_NS,
@@ -19,11 +23,11 @@ use kuri_api::power::{
 use kuri_api::registry::{
     Accelerator, AcceleratorKind, Announcement, Capability, CapabilityKind, Compute, Health, Link,
     LinkKind, NodeEvent, NodeId, NodeState, Rdma, RegistryError, RegistryReaderWatchResponse,
-    Scope, MAX_ACCELERATORS, MAX_CAPABILITIES, MAX_COMPUTE_CAPABILITIES, MAX_LINKS, MAX_NODES,
-    MAX_NODE_EVENTS, WATCH_TICK_NS,
+    Scope, MAX_ACCELERATORS, MAX_CAPABILITIES, MAX_COMPUTE_CAPABILITIES, MAX_INSTANCE_LEN,
+    MAX_LINKS, MAX_NAME_LEN, MAX_NODES, MAX_NODE_EVENTS, MAX_NODE_ID_LEN, WATCH_TICK_NS,
 };
 use kuri_api::revocation::{
-    Revocation, RevocationList, RevokeHeartbeat, REVOKE_HEARTBEAT_EVERY_NS,
+    Revocation, RevocationList, RevokeHeartbeat, MAX_REVOCATIONS, REVOKE_HEARTBEAT_EVERY_NS,
 };
 use serde::Serialize;
 use serde_json::{json, Value};
@@ -412,48 +416,136 @@ fn build() -> String {
         RegistryError,
         Scope,
     );
-    let union_members = |events: Vec<NodeEvent>| -> Vec<String> {
-        events
-            .iter()
-            .map(|e| match serde_json::to_value(e).unwrap() {
-                Value::Object(map) => map["type"].as_str().unwrap().to_owned(),
-                other => panic!("not a map: {other}"),
-            })
-            .collect()
+    // Each member's wire name and type, `()` for a member that carries
+    // nothing. The match has no wildcard, so a member added to `NodeEvent`
+    // does not compile here until it is listed.
+    let union_member = |event: NodeEvent| -> (String, String) {
+        let name = match serde_json::to_value(&event).unwrap() {
+            Value::Object(map) => map["type"].as_str().unwrap().to_owned(),
+            other => panic!("not a map: {other}"),
+        };
+        let ty = match &event {
+            NodeEvent::Existing(state) | NodeEvent::Added(state) | NodeEvent::Changed(state) => {
+                short(std::any::type_name_of_val(state))
+            }
+            NodeEvent::Idle => "()".to_owned(),
+            NodeEvent::Removed(node) => short(std::any::type_name_of_val(node)),
+            NodeEvent::Unknown => unreachable!("not a member of the definition"),
+        };
+        (name, ty)
     };
-    let unions = BTreeMap::from([(
+    let unions: BTreeMap<&str, BTreeMap<String, String>> = BTreeMap::from([(
         "NodeEvent",
-        union_members(vec![
+        [
             NodeEvent::Existing(node_state()),
             NodeEvent::Idle,
             NodeEvent::Added(node_state()),
             NodeEvent::Changed(node_state()),
             NodeEvent::Removed(node()),
-        ]),
+        ]
+        .into_iter()
+        .map(union_member)
+        .collect(),
     )]);
     let consts: BTreeMap<&str, i64> = BTreeMap::from([
         ("HOLD_ID_LEN", HOLD_ID_LEN as i64),
         ("MAX_ACCELERATORS", MAX_ACCELERATORS as i64),
         ("MAX_CAPABILITIES", MAX_CAPABILITIES as i64),
         ("MAX_COMPUTE_CAPABILITIES", MAX_COMPUTE_CAPABILITIES as i64),
+        ("MAX_GRANT_ID_LEN", MAX_GRANT_ID_LEN as i64),
         ("MAX_GRANT_LIFETIME_NS", MAX_GRANT_LIFETIME_NS),
+        ("MAX_HOLDER_KEY_LEN", MAX_HOLDER_KEY_LEN as i64),
         ("MAX_HOLD_NS", MAX_HOLD_NS),
+        ("MAX_INSTANCE_LEN", MAX_INSTANCE_LEN as i64),
+        ("MAX_ISSUED_EPOCH_LEN", MAX_ISSUED_EPOCH_LEN as i64),
         ("MAX_LINKS", MAX_LINKS as i64),
+        ("MAX_NAME_LEN", MAX_NAME_LEN as i64),
         ("MAX_NODES", MAX_NODES as i64),
         ("MAX_NODE_EVENTS", MAX_NODE_EVENTS as i64),
+        ("MAX_NODE_ID_LEN", MAX_NODE_ID_LEN as i64),
+        ("MAX_PRINCIPAL_LEN", MAX_PRINCIPAL_LEN as i64),
+        ("MAX_REVOCATIONS", MAX_REVOCATIONS as i64),
+        ("MAX_SIGNATURE_LEN", MAX_SIGNATURE_LEN as i64),
         ("MAX_ROUND_TRIP_NS", MAX_ROUND_TRIP_NS),
         ("READ_EVERY_NS", READ_EVERY_NS),
         ("REVOKE_HEARTBEAT_EVERY_NS", REVOKE_HEARTBEAT_EVERY_NS),
         ("TIME_NONCE_LEN", TIME_NONCE_LEN as i64),
         ("WATCH_TICK_NS", WATCH_TICK_NS),
     ]);
+    // The constant that bounds each bounded field. The definition writes a
+    // bound on the field, and the check reads the bound's value there, so
+    // each one is named here; the constants are the ones `tests/sizes.rs`
+    // sizes every message with.
+    let bounds: BTreeMap<&str, BTreeMap<&str, &str>> = BTreeMap::from([
+        ("Accelerator", BTreeMap::from([("model", "MAX_NAME_LEN")])),
+        (
+            "Announcement",
+            BTreeMap::from([
+                ("capabilities", "MAX_CAPABILITIES"),
+                ("label", "MAX_NAME_LEN"),
+                ("links", "MAX_LINKS"),
+            ]),
+        ),
+        (
+            "Capability",
+            BTreeMap::from([("instance", "MAX_INSTANCE_LEN")]),
+        ),
+        (
+            "Compute",
+            BTreeMap::from([("accelerators", "MAX_ACCELERATORS")]),
+        ),
+        (
+            "Grant",
+            BTreeMap::from([
+                ("grant_id", "MAX_GRANT_ID_LEN"),
+                ("holder_key", "MAX_HOLDER_KEY_LEN"),
+                ("instance", "MAX_INSTANCE_LEN"),
+                ("issued_epoch", "MAX_ISSUED_EPOCH_LEN"),
+                ("signature", "MAX_SIGNATURE_LEN"),
+            ]),
+        ),
+        (
+            "GrantRequest",
+            BTreeMap::from([
+                ("holder_key", "MAX_HOLDER_KEY_LEN"),
+                ("instance", "MAX_INSTANCE_LEN"),
+            ]),
+        ),
+        ("Link", BTreeMap::from([("segment", "MAX_NAME_LEN")])),
+        ("NodeId", BTreeMap::from([("bytes", "MAX_NODE_ID_LEN")])),
+        (
+            "PrincipalId",
+            BTreeMap::from([("bytes", "MAX_PRINCIPAL_LEN")]),
+        ),
+        (
+            "RegistryReaderWatchResponse",
+            BTreeMap::from([("events", "MAX_NODE_EVENTS")]),
+        ),
+        (
+            "RevocationList",
+            BTreeMap::from([("revocations", "MAX_REVOCATIONS")]),
+        ),
+    ]);
+    for (declaration, fields) in &bounds {
+        assert!(
+            tables.contains_key(declaration) || structs.contains_key(declaration),
+            "bounds name {declaration}, which is not mirrored"
+        );
+        for (field, constant) in fields {
+            assert!(
+                consts.contains_key(constant),
+                "{declaration}.{field}: {constant} is not listed"
+            );
+        }
+    }
     let mut file = json!({
-        "about": "What this crate mirrors of the contracts' definition, generated from its types: tables and structs with their fields and each field's Rust type, enums with their members' names and numbers, unions with their members' names, constants with their values. Names are this crate's; enum members are in their wire form.",
+        "about": "What this crate mirrors of the contracts' definition, generated from its types: tables and structs with their fields and each field's Rust type, enums with their members' names and numbers, unions with their members' names and types, constants with their values, and for each bounded field the constant that bounds it. Names are this crate's; enum and union members are in their wire form.",
         "tables": tables,
         "structs": structs,
         "enums": enums,
         "unions": unions,
         "consts": consts,
+        "bounds": bounds,
     });
     // Keys in sorted order, whether or not serde_json's `preserve_order` is
     // on, as it is wherever a crate in the same build enables it.
