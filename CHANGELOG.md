@@ -1,5 +1,22 @@
 # Changelog
 
+## 0.1.3 — 2026-11-21
+
+- `MAX_MESSAGE_BYTES`: the longest message on the home's mesh, 64 KiB, as a
+  FIDL channel message. Every message this crate defines fits with every
+  field at its bound, and `tests/sizes.rs` checks that; the largest, a watch
+  answer of eight events, is 43 457 bytes.
+- Documentation: a reader bounds a message's bytes, checks its signature where
+  that covers the raw bytes, and only then decodes it. Before, it said to
+  bound the decoded value, which by then has taken its memory.
+- `from_cbor` refuses bytes after the value, for every type. A writer never
+  sends them, and they would hide a framing error. It still sets no limit on
+  the input's size, since it also decodes messages other than these.
+- `MAX_REVOCATIONS`: the most revocations in a `RevocationList`, 128.
+- Tests: the surface lists the clock and revocation types, each union
+  member's type, the constants that bound fields, and which constant bounds
+  each bounded field.
+
 ## 0.1.2 — 2026-11-20
 
 - `Grant::check_without_clock`: the grant check without its deadline, for a
